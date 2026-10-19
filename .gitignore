@@ -120,3 +120,6 @@ app.*.symbols
 
 # Secrets
 secrets.json
+
+# DS Store
+.DS_Store
