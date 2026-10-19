@@ -23,7 +23,6 @@ class VideoApp extends StatefulWidget {
 }
 
 class _VideoAppState extends State<VideoApp> {
-  final MediaDownloader _mediaDownloader = MediaDownloader();
   final MediaCacher _mediaCacher = MediaCacher();
   final ApiCall _apiCall = ApiCall();
   List<MediaLink> _mediaLinks = [];
@@ -275,7 +274,7 @@ class _VideoAppState extends State<VideoApp> {
       Duration(milliseconds: (media.duration ?? 5000).round()),
       _playNextMedia,
     );
-    
+  }
   // Skip current media because of error
   // // Remove media from list
   void _skipMedia() {
@@ -322,7 +321,7 @@ class _VideoAppState extends State<VideoApp> {
         nextVideoPath = blobUrl;
         nextController = VideoPlayerController.networkUrl(Uri.parse(blobUrl));
       } else {
-        nextVideoPath = media.link;
+        nextVideoPath = media.localPath!;
         nextController = VideoPlayerController.file(File(nextVideoPath));
       }
 
@@ -384,7 +383,7 @@ class _VideoAppState extends State<VideoApp> {
         imagePath = await _mediaCacher.loadImageBlobUrlFromIndexedDB(media.id!);
         imageProvider = NetworkImage(imagePath);
       } else {
-        imagePath = media.link;
+        imagePath = media.localPath!;
         imageProvider = FileImage(File(imagePath));
       }
 
@@ -423,9 +422,11 @@ class _VideoAppState extends State<VideoApp> {
     
     if(_checkSchedule) {
       await _checkForMediaChanges();
+      _checkSchedule = false;
     }
     if(_checkPayload) {
       await _checkForMediaChanges(checkPayload: true);
+      _checkPayload = false;
     }
     if (_changingPlaylist) {
       unawaited(_startNextPlaylist());
@@ -603,15 +604,6 @@ class _VideoAppState extends State<VideoApp> {
     );
   }
 
-  // Dispose of the controller and cancel the timer when the widget is disposed.
-  @override
-  void dispose() {
-    _imageTimer?.cancel();
-    final controller = _controller;
-    unawaited(() async {
-      await controller?.dispose();
-      await _evictActiveImage();
-    }());
   // Button to play next playlist for testing
   Widget _buildNextPlaylistButton() {
     return AnimatedSwitcher(
@@ -628,22 +620,26 @@ class _VideoAppState extends State<VideoApp> {
         elevation: 0,
         onPressed: () {
           setState(() {
-            _changingPlaylist = true;
-            if (_mediaLinks.isEmpty) _startNextPlaylist();
+            _checkPayload = true;
           });
         },
         icon: const Icon(Icons.play_arrow),
-        label: const Text('Next'),
+        label: const Text('Refresh'),
       ),
     );
   }
 
+  // Dispose of the controller and cancel the timer when the widget is disposed.
   @override
   void dispose() {
     _imageTimer?.cancel();
     _scheduleCheckTimer?.cancel();
     _payloadCheckTimer?.cancel();
-    _controller?.dispose();
+    final controller = _controller;
+    unawaited(() async {
+      await controller?.dispose();
+      await _evictActiveImage();
+    }());
     unawaited(WakelockPlus.disable());
     super.dispose();
   }
