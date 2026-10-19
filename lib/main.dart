@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -83,6 +84,7 @@ class _VideoAppState extends State<VideoApp> {
     bool startChangeChecks = false,
   }) async {
     try {
+      print('test');
       // If on web give back just the links,
       //  otherwise download media.
       //  otherwise if media is empty download media.
@@ -97,7 +99,7 @@ class _VideoAppState extends State<VideoApp> {
       _isPreparingMedia = false;
       if (mounted) setState(() {});
       await _initializeMedia();
-      if (startChangeChecks && !kIsWeb) {
+      if (startChangeChecks) {
         _startChangeChecks();
       }
     } catch (error) {
@@ -115,11 +117,21 @@ class _VideoAppState extends State<VideoApp> {
   void _startChangeChecks() {
     _scheduleCheckTimer ??= Timer.periodic(
       const Duration(minutes: 1),
-      (_) => _checkSchedule = true,
+      (_) { 
+        _checkSchedule = true;
+        if(_mediaLinks.isEmpty) {
+            unawaited(_prepareMedia(mediaLinks));
+        }
+      }
     );
     _payloadCheckTimer ??= Timer.periodic(
       const Duration(minutes: 15),
-      (_) => _checkPayload = true,
+      (_) {
+        _checkPayload = true;
+        if(_mediaLinks.isEmpty) {
+            unawaited(_prepareMedia(mediaLinks));
+        }
+      }
     );
   }
 
@@ -526,7 +538,7 @@ class _VideoAppState extends State<VideoApp> {
 
     if (_mediaLinks.isEmpty) {
       return Image.asset(
-        'assets/placeholder.png',
+        'assets/placeholder-green.png',
         fit: BoxFit.contain,
         height: double.infinity,
         width: double.infinity,
