@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_video_test/media_cacher_stub.dart'
     if (dart.library.js_interop) 'package:flutter_video_test/media_cacher.dart';
+import 'package:flutter_video_test/media_downloader.dart';
 import 'package:video_player/video_player.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
@@ -25,6 +26,7 @@ class VideoApp extends StatefulWidget {
 class _VideoAppState extends State<VideoApp> {
   final MediaCacher _mediaCacher = MediaCacher();
   final ApiCall _apiCall = ApiCall();
+  final MediaDownloader _mediaDownloader = MediaDownloader();
   List<MediaLink> _mediaLinks = [];
   List<MediaLink> _mediaLinksFrame = [];
 
@@ -70,13 +72,6 @@ class _VideoAppState extends State<VideoApp> {
     super.initState();
     unawaited(WakelockPlus.enable());
     unawaited(_prepareMedia(mediaLinks, mediaLinksFrames, startChangeChecks: true));
-  }
-
-  // Check which webbrowser the user is using
-  void _checkForWebBrowser() {
-    if (kIsWeb) {
-      _browser = Browser.detectOrNull();
-    }
   }
 
   // Start Next Playlist
@@ -134,7 +129,7 @@ class _VideoAppState extends State<VideoApp> {
       (_) { 
         _checkSchedule = true;
         if(_mediaLinks.isEmpty) {
-            unawaited(_prepareMedia(mediaLinks));
+            unawaited(_prepareMedia(mediaLinks, mediaLinksFrames));
         }
       }
     );
@@ -143,7 +138,7 @@ class _VideoAppState extends State<VideoApp> {
       (_) {
         _checkPayload = true;
         if(_mediaLinks.isEmpty) {
-            unawaited(_prepareMedia(mediaLinks));
+            unawaited(_prepareMedia(mediaLinks, mediaLinksFrames));
         }
       }
     );
@@ -806,7 +801,7 @@ class _VideoAppState extends State<VideoApp> {
           setState(() {
             _checkPayload = true;
             if(_mediaLinks.isEmpty) {
-              _prepareMedia(mediaLinks);
+              _prepareMedia(mediaLinks, mediaLinksFrames);
             }
           });
         },
