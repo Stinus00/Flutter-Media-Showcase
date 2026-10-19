@@ -21,27 +21,27 @@ import 'media_link.dart';
 //   MediaLink(
 //     link: 'https://s3.eu-central-003.backblazeb2.com/bcm-test-stijn/images/sample%206.png', 
 //     type: "image",
-//     duration: 70000
+//     duration: 7000
 //   ),
 //   MediaLink(
 //     link: 'https://s3.eu-central-003.backblazeb2.com/bcm-test-stijn/images/sample%207.png', 
 //     type: "image",
-//     duration: 60000
+//     duration: 6000
 //   ),
 //   MediaLink(
 //     link: 'https://s3.eu-central-003.backblazeb2.com/bcm-test-stijn/images/tania-mousinho-YlpfE9uCakE-unsplash.jpg', 
 //     type: "image",
-//     duration: 40000
+//     duration: 4000
 //   ),
 //   MediaLink(
 //     link: 'https://s3.eu-central-003.backblazeb2.com/bcm-test-stijn/images/timo-volz-ZlFKIG6dApg-unsplash.jpg', 
 //     type: "image",
-//     duration: 100000
+//     duration: 10000
 //   ),
 //   MediaLink(
 //     link: 'https://s3.eu-central-003.backblazeb2.com/bcm-test-stijn/images/beertje.jpg', 
 //     type: "image",
-//     duration: 50000
+//     duration: 5000
 //   ),
 // ];
 
@@ -84,30 +84,30 @@ const List <MediaLink> mediaLinks = [
   MediaLink(
     link: 'https://s3.eu-central-003.backblazeb2.com/bcm-test-stijn/images/timo-volz-ZlFKIG6dApg-unsplash.jpg', 
     type: "image",
-    duration: 100000
+    duration: 10000
   ),
   MediaLink(
     link: 'https://s3.eu-central-003.backblazeb2.com/bcm-test-stijn/images/beertje.jpg', 
     type: "image",
-    duration: 50000
+    duration: 5000
   ),
 ];
 
 const List<MediaLink> mediaLinksFrames = [
-  // MediaLink(link:'https://s3.eu-central-003.backblazeb2.com/bcmdatabucket1/graphics/templateimages_n/0010/ftp_0042%20X1=275%20Y1=154%20X2=1645%20Y2=926.png', type: 'image', duration: 100000),
-  MediaLink(link:'https://s3.eu-central-003.backblazeb2.com/bcmdatabucket1/graphics/templateimages_n/0010/ftp_0043%20X1=275%20Y1=154%20X2=1645%20Y2=926.png', type:'image', duration:150000),
-  MediaLink(link:'https://s3.eu-central-003.backblazeb2.com/bcmdatabucket1/graphics/templateimages_n/0037/ftp_0270%20X1%3D477%20Y1%3D154%20X2%3D1847%20Y2%3D926.png', type:'image', duration:150000),
-  MediaLink(link:'https://s3.eu-central-003.backblazeb2.com/bcmdatabucket1/graphics/templateimages_n/0010/ftp_0045%20X1=275%20Y1=154%20X2=1645%20Y2=926.png', type:'image', duration:150000),
-  MediaLink(link:'https://s3.eu-central-003.backblazeb2.com/bcmdatabucket1/graphics/templateimages_n/0037/ftp_0271%20X1%3D477%20Y1%3D154%20X2%3D1847%20Y2%3D926.png', type:'image', duration:150000),
-  // MediaLink(link:'https://s3.eu-central-003.backblazeb2.com/bcmdatabucket1/graphics/templateimages_n/0010/ftp_0046%20X1=275%20Y1=154%20X2=1645%20Y2=926.png', type:'image',duration:40000),
-  // MediaLink(link:'https://s3.eu-central-003.backblazeb2.com/bcmdatabucket1/graphics/templateimages_n/0010/ftp_0047%20X1=275%20Y1=154%20X2=1645%20Y2=926.png', type:'image',duration:40000),
-  // MediaLink(link:'https://s3.eu-central-003.backblazeb2.com/bcmdatabucket1/graphics/templateimages_n/0037/ftp_0272%20X1%3D73%20Y1%3D235%20X2%3D1443%20Y2%3D1007.png', type:'image', duration:40000),
-  // MediaLink(link:'https://s3.eu-central-003.backblazeb2.com/bcmdatabucket1/graphics/templateimages_n/0010/ftp_0048%20X1=275%20Y1=154%20X2=1645%20Y2=926.png', type:'image',duration:40000),
-  // MediaLink(link:'https://s3.eu-central-003.backblazeb2.com/bcmdatabucket1/graphics/templateimages_n/0010/ftp_0049%20X1=275%20Y1=154%20X2=1645%20Y2=926.png', type:'image',duration:40000),
-  // MediaLink(link:'https://s3.eu-central-003.backblazeb2.com/bcmdatabucket1/graphics/templateimages_n/0037/ftp_0273%20X1%3D477%20Y1%3D154%20X2%3D1847%20Y2%3D926.png', type:'image', duration:40000),
-  // MediaLink(link:'https://s3.eu-central-003.backblazeb2.com/bcmdatabucket1/graphics/templateimages_n/0010/ftp_0078%20X1=275%20Y1=154%20X2=1645%20Y2=926.png', type:'image',duration:40000),
-  // MediaLink(link:'https://s3.eu-central-003.backblazeb2.com/bcmdatabucket1/graphics/templateimages_n/0010/ftp_0105%20X1=275%20Y1=154%20X2=1645%20Y2=926.png', type:'image',duration:40000),
-  // MediaLink(link:'https://s3.eu-central-003.backblazeb2.com/bcmdatabucket1/graphics/templateimages_n/0010/ftp_0106%20X1=275%20Y1=154%20X2=1645%20Y2=926.png', type:'image',duration:40000),
+  // MediaLink(link:'https://s3.eu-central-003.backblazeb2.com/bcmdatabucket1/graphics/templateimages_n/0010/ftp_0042%20X1=275%20Y1=154%20X2=1645%20Y2=926.png', type: 'image', duration: 10000),
+  MediaLink(link:'https://s3.eu-central-003.backblazeb2.com/bcmdatabucket1/graphics/templateimages_n/0010/ftp_0043%20X1=275%20Y1=154%20X2=1645%20Y2=926.png', type:'image', duration:15000, id: 'name1'),
+  MediaLink(link:'https://s3.eu-central-003.backblazeb2.com/bcmdatabucket1/graphics/templateimages_n/0037/ftp_0270%20X1%3D477%20Y1%3D154%20X2%3D1847%20Y2%3D926.png', type:'image', duration:15000, id: 'name2'),
+  MediaLink(link:'https://s3.eu-central-003.backblazeb2.com/bcmdatabucket1/graphics/templateimages_n/0010/ftp_0045%20X1=275%20Y1=154%20X2=1645%20Y2=926.png', type:'image', duration:15000, id: 'name3'),
+  MediaLink(link:'https://s3.eu-central-003.backblazeb2.com/bcmdatabucket1/graphics/templateimages_n/0037/ftp_0271%20X1%3D477%20Y1%3D154%20X2%3D1847%20Y2%3D926.png', type:'image', duration:15000, id: 'name4'),
+  // MediaLink(link:'https://s3.eu-central-003.backblazeb2.com/bcmdatabucket1/graphics/templateimages_n/0010/ftp_0046%20X1=275%20Y1=154%20X2=1645%20Y2=926.png', type:'image',duration:4000),
+  // MediaLink(link:'https://s3.eu-central-003.backblazeb2.com/bcmdatabucket1/graphics/templateimages_n/0010/ftp_0047%20X1=275%20Y1=154%20X2=1645%20Y2=926.png', type:'image',duration:4000),
+  // MediaLink(link:'https://s3.eu-central-003.backblazeb2.com/bcmdatabucket1/graphics/templateimages_n/0037/ftp_0272%20X1%3D73%20Y1%3D235%20X2%3D1443%20Y2%3D1007.png', type:'image', duration:4000),
+  // MediaLink(link:'https://s3.eu-central-003.backblazeb2.com/bcmdatabucket1/graphics/templateimages_n/0010/ftp_0048%20X1=275%20Y1=154%20X2=1645%20Y2=926.png', type:'image',duration:4000),
+  // MediaLink(link:'https://s3.eu-central-003.backblazeb2.com/bcmdatabucket1/graphics/templateimages_n/0010/ftp_0049%20X1=275%20Y1=154%20X2=1645%20Y2=926.png', type:'image',duration:4000),
+  // MediaLink(link:'https://s3.eu-central-003.backblazeb2.com/bcmdatabucket1/graphics/templateimages_n/0037/ftp_0273%20X1%3D477%20Y1%3D154%20X2%3D1847%20Y2%3D926.png', type:'image', duration:4000),
+  // MediaLink(link:'https://s3.eu-central-003.backblazeb2.com/bcmdatabucket1/graphics/templateimages_n/0010/ftp_0078%20X1=275%20Y1=154%20X2=1645%20Y2=926.png', type:'image',duration:4000),
+  // MediaLink(link:'https://s3.eu-central-003.backblazeb2.com/bcmdatabucket1/graphics/templateimages_n/0010/ftp_0105%20X1=275%20Y1=154%20X2=1645%20Y2=926.png', type:'image',duration:4000),
+  // MediaLink(link:'https://s3.eu-central-003.backblazeb2.com/bcmdatabucket1/graphics/templateimages_n/0010/ftp_0106%20X1=275%20Y1=154%20X2=1645%20Y2=926.png', type:'image',duration:4000),
   // MediaLink(
   //   link: 'https://s3.eu-central-003.backblazeb2.com/production--remote-webapp/videos/d69268db-64a3-4412-94f2-069b99e8aa91/samba.mp4',
   //   type: 'video',

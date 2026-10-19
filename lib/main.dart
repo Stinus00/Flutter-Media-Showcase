@@ -283,7 +283,7 @@ class _VideoAppState extends State<VideoApp> {
     }
     _updateFrameCoordinates(mediaFrame.link);
     if (mediaFrame.type == 'image') {
-      _framePath = kIsWeb ? null : mediaFrame.link;
+      _framePath = kIsWeb ? null : mediaFrame.localPath;
 
       if (!mounted) return;
       setState(() {});
@@ -546,7 +546,7 @@ class _VideoAppState extends State<VideoApp> {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Video Demo',
-      theme: ThemeData(scaffoldBackgroundColor: Colors.black),
+      theme: ThemeData(scaffoldBackgroundColor: Colors.white),
       home: Scaffold(
         body: LayoutBuilder(
           builder: (context, constraints) {
