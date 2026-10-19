@@ -86,9 +86,11 @@ class _VideoAppState extends State<VideoApp> {
       // If on web give back just the links,
       //  otherwise download media.
       //  otherwise if media is empty download media.
-      if (kIsWeb) {
-        _mediaLinks = await _mediaCacher.cacheAllMedia(links: mediaLinks);
-      } else if (_mediaLinks.isEmpty) {
+
+      // if (kIsWeb) {
+      //   _mediaLinks = await _mediaCacher.cacheAllMedia(links: mediaLinks);
+      // } else 
+      if (_mediaLinks.isEmpty) {
         _mediaLinks = await _apiCall.getMediaFromApi();
       }
 
@@ -467,15 +469,15 @@ class _VideoAppState extends State<VideoApp> {
               bottom: 16,
               child: _buildNextPlaylistButton(),
             ),
-            if (kIsWeb)
-              Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text('Browser is ${_browser?.browser ?? 'Not on web'}'),
-                  Text('Version is ${_browser?.version ?? 'Not on web'}'),
-                ],
-              ),
+            // if (kIsWeb)
+            //   Column(
+            //     mainAxisAlignment: MainAxisAlignment.center,
+            //     mainAxisSize: MainAxisSize.min,
+            //     children: [
+            //       Text('Browser is ${_browser?.browser ?? 'Not on web'}'),
+            //       Text('Version is ${_browser?.version ?? 'Not on web'}'),
+            //     ],
+            //   ),
           ],
         ),
       ),
@@ -621,6 +623,9 @@ class _VideoAppState extends State<VideoApp> {
         onPressed: () {
           setState(() {
             _checkPayload = true;
+            if(_mediaLinks.isEmpty) {
+              _prepareMedia(mediaLinks);
+            }
           });
         },
         icon: const Icon(Icons.play_arrow),

@@ -5,21 +5,29 @@ import 'package:flutter/foundation.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_video_test/api_mcc_data.dart';
+import 'package:flutter_video_test/media_cacher_stub.dart'
+    if (dart.library.js_interop) 'package:flutter_video_test/media_cacher.dart';
 import 'package:flutter_video_test/media_downloader.dart';
 import 'package:flutter_video_test/media_link.dart';
 import 'package:intl/intl.dart';
 import 'package:teno_rrule/teno_rrule.dart';
 
 class ApiCall {
-  ApiCall({Dio? dio, MediaDownloader? downloader})
+  ApiCall({Dio? dio, MediaDownloader? downloader, MediaCacher? cacher})
     : _dio = dio ?? Dio(),
-      _downloader = downloader ?? MediaDownloader();
+      _downloader = downloader ?? MediaDownloader(),
+      _cacher = cacher ?? MediaCacher();
 
   final Dio _dio;
   final MediaDownloader _downloader;
+  final MediaCacher _cacher;
+
   String? _currentResponseJson;
   String? _pendingResponseJson;
   Set<String>? _lastActiveScheduleIds;
+
+  // For Web
+  String? oldJson;
 
   final _playlistsMap = {};
 
@@ -362,7 +370,11 @@ class ApiCall {
 
   // Download all media gotten from API
   Future<List<MediaLink>> _downloadMedia(List<MediaLink> media) async {
-    return await _downloader.downloadAllMedia(links: media);
+    if(kIsWeb) {
+      return await _cacher.cacheAllMedia(links: media);
+    } else {
+      return await _downloader.downloadAllMedia(links: media);
+    }
   }
 
   // Shorten json data given, removing unnecessary objects.
@@ -383,23 +395,31 @@ class ApiCall {
     final decodedJson = jsonDecode(jsonString);
     final formattedJson = const JsonEncoder.withIndent('  ')
         .convert(decodedJson);
-
-    final directory = await _downloader.downloadDirectory;
-    final jsonDirectory = Directory('${directory.path}/json');
-    final file = File('${jsonDirectory.path}/old_api_response.json');
-    await file.create(recursive: true);
-    await file.writeAsString(formattedJson);
+    
+    if(kIsWeb) {
+      oldJson = formattedJson;
+    } else {
+      final directory = await _downloader.downloadDirectory;
+      final jsonDirectory = Directory('${directory.path}/json');
+      final file = File('${jsonDirectory.path}/old_api_response.json');
+      await file.create(recursive: true);
+      await file.writeAsString(formattedJson);
+    }
   }
 
   // Load saved API response for comparison
   Future<Map<String, dynamic>> _loadOldApiResponse() async {
-    final directory = await _downloader.downloadDirectory;
-    final file = File('${directory.path}/json/old_api_response.json');
-    if (!file.existsSync()) {
-      throw Exception('Old API response file not found.');
+    if(kIsWeb) {
+      return jsonDecode(oldJson!);
+    } else {
+      final directory = await _downloader.downloadDirectory;
+      final file = File('${directory.path}/json/old_api_response.json');
+      if (!file.existsSync()) {
+        throw Exception('Old API response file not found.');
+      }
+      final jsonString = file.readAsStringSync();
+      return jsonDecode(jsonString) as Map<String, dynamic>;
     }
-    final jsonString = file.readAsStringSync();
-    return jsonDecode(jsonString) as Map<String, dynamic>;
   }
 
   // Get current date
