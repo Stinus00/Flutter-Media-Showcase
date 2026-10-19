@@ -14,7 +14,9 @@ dependencies:
   html: ^0.15.7
   http: ^1.6.0
   idb_shim: ^2.9.9
+  intl: ^0.20.3
   path_provider: ^2.1.6
+  teno_rrule: ^0.0.10
   video_player: ^2.14.0
   wakelock_plus: ^1.8.0
   web: ^1.1.1
@@ -29,3 +31,4 @@ flutter:
   uses-material-design: true
   assets:
     - assets/
+    - assets/json/secrets.json

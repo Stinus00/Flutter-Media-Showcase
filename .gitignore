@@ -119,4 +119,4 @@ app.*.symbols
 !/dev/ci/**/Gemfile.lock
 
 # Secrets
-assets/json/secrets.json
+secrets.json

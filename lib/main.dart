@@ -9,9 +9,9 @@ import 'package:video_player/video_player.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:web_browser_detect/web_browser_detect.dart';
 
-import 'media_downloader.dart';
 import 'media_link.dart';
 import 'media_sources.dart';
+import 'api_call.dart';
 
 void main() => runApp(const VideoApp());
 
@@ -25,7 +25,11 @@ class VideoApp extends StatefulWidget {
 class _VideoAppState extends State<VideoApp> {
   final MediaDownloader _mediaDownloader = MediaDownloader();
   final MediaCacher _mediaCacher = MediaCacher();
+  final ApiCall _apiCall = ApiCall();
   List<MediaLink> _mediaLinks = [];
+
+  // Testing
+  bool _initialPlaylistActive = true;
 
   String? _imagePath;
   ImageProvider? _activeImageProvider;
@@ -37,8 +41,15 @@ class _VideoAppState extends State<VideoApp> {
   bool _isChangingVideo = false;
   bool _hasStartedPlayback = false;
   bool _isPreparingMedia = true;
+  bool _changingPlaylist = false;
   String? _preloadError;
   int _currentLinkIndex = 0;
+  Timer? _scheduleCheckTimer;
+  Timer? _payloadCheckTimer;
+  bool _checkSchedule = false;
+  bool _checkPayload = false;
+  bool _isCheckingForChanges = false;
+  bool _payloadCheckQueued = false;
 
   Browser? _browser;
 
@@ -49,7 +60,7 @@ class _VideoAppState extends State<VideoApp> {
   void initState() {
     super.initState();
     unawaited(WakelockPlus.enable());
-    unawaited(_prepareMedia());
+    unawaited(_prepareMedia(mediaLinks, startChangeChecks: true));
   }
 
   // Check which webbrowser the user is using
@@ -59,17 +70,35 @@ class _VideoAppState extends State<VideoApp> {
     }
   }
 
+  // Start Next Playlist
+  Future<void> _startNextPlaylist() async {
+    _currentLinkIndex = 0;
+    _prepareMedia(_initialPlaylistActive ? mediaLinksExtra : mediaLinks);
+    _initialPlaylistActive = !_initialPlaylistActive;
+    _changingPlaylist = false;
+  }
+
   // Download the media given and initialize the first media.
-  Future<void> _prepareMedia() async {
+  Future<void> _prepareMedia(
+    List<MediaLink> links, {
+    bool startChangeChecks = false,
+  }) async {
     try {
       // If on web give back just the links,
       //  otherwise download media.
-      _mediaLinks = kIsWeb == true
-          ? await _mediaCacher.cacheAllMedia(links: mediaLinks)
-          : await _mediaDownloader.downloadAllMedia(links: mediaLinks);
+      //  otherwise if media is empty download media.
+      if (kIsWeb) {
+        _mediaLinks = await _mediaCacher.cacheAllMedia(links: mediaLinks);
+      } else if (_mediaLinks.isEmpty) {
+        _mediaLinks = await _apiCall.getMediaFromApi();
+      }
+
       _isPreparingMedia = false;
       if (mounted) setState(() {});
       await _initializeMedia();
+      if (startChangeChecks && !kIsWeb) {
+        _startChangeChecks();
+      }
     } catch (error) {
       if (!mounted) return;
       setState(() {
@@ -79,12 +108,76 @@ class _VideoAppState extends State<VideoApp> {
     }
   }
 
+  // Start timers
+  // // 1 minute for checking if schedules changed
+  // // 15 minutes for checking if api changed
+  void _startChangeChecks() {
+    _scheduleCheckTimer ??= Timer.periodic(
+      const Duration(minutes: 1),
+      (_) => _checkSchedule = true,
+    );
+    _payloadCheckTimer ??= Timer.periodic(
+      const Duration(minutes: 15),
+      (_) => _checkPayload = true,
+    );
+  }
+
+  // Check if there's any changes in api or schedules
+  // Clear everything if there are changes.
+  Future<void> _checkForMediaChanges({bool checkPayload = false}) async {
+    if (_isPreparingMedia) return;
+    if (_isCheckingForChanges) {
+      _payloadCheckQueued = _payloadCheckQueued || checkPayload;
+      return;
+    }
+
+    _isCheckingForChanges = true;
+    try {
+      final payloadChanged = checkPayload
+          ? await _apiCall.hasPayloadChanged()
+          : false;
+      final schedulesChanged = _apiCall.haveSchedulesChanged();
+      if (!payloadChanged && !schedulesChanged) return;
+
+      final updatedMediaLinks = await _apiCall
+          .rebuildMediaForCurrentSchedules();
+      _isChangingVideo = true;
+      _imageTimer?.cancel();
+      _imageTimer = null;
+      final controller = _controller;
+      controller?.removeListener(_handleVideoState);
+      await controller?.dispose();
+      _controller = null;
+      _mediaLinks = updatedMediaLinks;
+      _currentLinkIndex = 0;
+      _videoError = null;
+      _imagePath = null;
+      _videoPath = null;
+      _isChangingVideo = false;
+
+      if (!mounted) return;
+      setState(() {});
+      await _initializeMedia();
+    } catch (error) {
+      debugPrint('Error checking for media changes: $error');
+    } finally {
+      _isChangingVideo = false;
+      _isCheckingForChanges = false;
+      if (_payloadCheckQueued && mounted) {
+        _payloadCheckQueued = false;
+        unawaited(_checkForMediaChanges(checkPayload: true));
+      }
+    }
+  }
+
   // Check if first media is image or video
   //  then set first media appropriately
   //  (set timer for image and set controller for video)
   Future<void> _initializeMedia() async {
     final media = _currentMedia;
-    if (media == null) return;
+    if (media == null) {
+      return;
+    }
     if (media.type == 'image') {
       if (kIsWeb) {
         try {
@@ -102,7 +195,7 @@ class _VideoAppState extends State<VideoApp> {
           return;
         }
       } else {
-        _imagePath = media.link;
+        _imagePath = media.localPath;
       }
 
       if (!mounted) return;
@@ -119,7 +212,7 @@ class _VideoAppState extends State<VideoApp> {
     //  use url if on web.
     VideoPlayerController controller;
     if (!kIsWeb) {
-      _videoPath = media.link;
+      _videoPath = media.localPath;
       controller = VideoPlayerController.file(File(_videoPath!));
     } else {
       try {
@@ -182,6 +275,13 @@ class _VideoAppState extends State<VideoApp> {
       Duration(milliseconds: (media.duration ?? 5000).round()),
       _playNextMedia,
     );
+    
+  // Skip current media because of error
+  // // Remove media from list
+  void _skipMedia() {
+    _mediaLinks.removeAt(_currentLinkIndex);
+    _currentLinkIndex -= 1;
+    _playNextMedia();
   }
 
   // Play next media.
@@ -320,6 +420,18 @@ class _VideoAppState extends State<VideoApp> {
     _activeImageProvider = imageProvider;
     _videoPath = null;
     _isChangingVideo = false;
+    
+    if(_checkSchedule) {
+      await _checkForMediaChanges();
+    }
+    if(_checkPayload) {
+      await _checkForMediaChanges(checkPayload: true);
+    }
+    if (_changingPlaylist) {
+      unawaited(_startNextPlaylist());
+      return;
+    }
+    await _initializeMedia();
     setState(() {});
 
     if (imageError == null && (!kIsWeb || _hasStartedPlayback)) {
@@ -349,6 +461,20 @@ class _VideoAppState extends State<VideoApp> {
           children: [
             Center(child: _buildMedia()),
             _buildStartButton(),
+            Positioned(
+              right: 16,
+              bottom: 16,
+              child: _buildNextPlaylistButton(),
+            ),
+            if (kIsWeb)
+              Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text('Browser is ${_browser?.browser ?? 'Not on web'}'),
+                  Text('Version is ${_browser?.version ?? 'Not on web'}'),
+                ],
+              ),
           ],
         ),
       ),
@@ -375,6 +501,8 @@ class _VideoAppState extends State<VideoApp> {
       );
     }
     if (_videoError != null) {
+      _skipMedia();
+
       return Padding(
         padding: const EdgeInsets.all(24),
         child: Text(
@@ -393,8 +521,17 @@ class _VideoAppState extends State<VideoApp> {
       );
     }
 
-    // Show the media if there is no error
+    if (_mediaLinks.isEmpty) {
+      return Image.asset(
+        'assets/placeholder.png',
+        fit: BoxFit.contain,
+        height: double.infinity,
+        width: double.infinity,
+      );
+    }
+
     final media = _currentMedia!;
+
     if (media.type == 'image') {
       if (kIsWeb) {
         return _imagePath == null
@@ -475,6 +612,38 @@ class _VideoAppState extends State<VideoApp> {
       await controller?.dispose();
       await _evictActiveImage();
     }());
+  // Button to play next playlist for testing
+  Widget _buildNextPlaylistButton() {
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 250),
+      transitionBuilder: (child, animation) => ScaleTransition(
+        scale: animation,
+        child: FadeTransition(opacity: animation, child: child),
+      ),
+      child: FloatingActionButton.extended(
+        key: const ValueKey('sample-button'),
+        backgroundColor: const Color.fromARGB(98, 59, 128, 255),
+        hoverColor: const Color.fromARGB(97, 45, 119, 255),
+        foregroundColor: Colors.white,
+        elevation: 0,
+        onPressed: () {
+          setState(() {
+            _changingPlaylist = true;
+            if (_mediaLinks.isEmpty) _startNextPlaylist();
+          });
+        },
+        icon: const Icon(Icons.play_arrow),
+        label: const Text('Next'),
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    _imageTimer?.cancel();
+    _scheduleCheckTimer?.cancel();
+    _payloadCheckTimer?.cancel();
+    _controller?.dispose();
     unawaited(WakelockPlus.disable());
     super.dispose();
   }

@@ -63,7 +63,7 @@ const List<MediaLink> mediaLinks = [
 // // Images Only
 // const List<MediaLink> mediaLinks = [
 //   MediaLink(
-//     link: 'https://s3.eu-central-003.backblazeb2.com/bcm-test-stijn/images/sample%204.png', 
+//     link: 'http://broken/link', 
 //     type: "image",
 //     duration: 5000.0
 //   ),
