@@ -7,8 +7,12 @@ import 'package:path_provider/path_provider.dart';
 
 class MediaDownloader {
   MediaDownloader({Dio? dio}) : _dio = dio ?? Dio();
-
   final Dio _dio;
+
+  Future<Directory> get downloadDirectory async {
+    final directory = await getApplicationDocumentsDirectory();
+    return directory;
+  }
 
   // Download all media gathered from media_sources
   Future<List<MediaLink>> downloadAllMedia({
@@ -18,8 +22,8 @@ class MediaDownloader {
 
     for (final media in links) {
       final path = media.type == 'image'
-          ? await _downloadImage(link: media.link)
-          : await _downloadVideo(link: media.link);
+          ? await _downloadImage(link: media.link, name: media.id!)
+          : await _downloadVideo(link: media.link, name: media.id!);
 
       if(path == '') {
         continue;
@@ -27,9 +31,12 @@ class MediaDownloader {
 
       downloadedLinks.add(
         MediaLink(
-          link: path,
+          id: media.id,
+          link: media.link,
           type: media.type,
           duration: media.duration,
+          mimeType: media.mimeType,
+          localPath: path,
         ),
       );
     }
@@ -40,12 +47,12 @@ class MediaDownloader {
   // Start download on image
   Future<String> _downloadImage({
     required String link,
+    required String name,
     void Function(int received, int total)? onReceiveProgress,
   }) async {
-    final directory = await getApplicationDocumentsDirectory();
-    final name = _fileName(link);
+    final directory = await downloadDirectory;
     final imageDirectory = Directory('${directory.path}/images');
-    final file = File('${imageDirectory.path}/$name.jpg');
+    final file = File('${imageDirectory.path}/$name.${_getFileExtension(link)}');
 
     try {
       if (!await file.exists()) {
@@ -66,13 +73,13 @@ class MediaDownloader {
   // Start download on video
   Future<String> _downloadVideo({
     required String link,
+    required String name,
     void Function(int received, int total)? onReceiveProgress,
   }) async {
 
-    final directory = await getApplicationDocumentsDirectory();
-    final name = _fileName(link);
+    final directory = await downloadDirectory;
     final videoDirectory = Directory('${directory.path}/videos');
-    final file = File('${videoDirectory.path}/$name.mp4');
+    final file = File('${videoDirectory.path}/$name.${_getFileExtension(link)}');
 
     if (!_checkHttp(link) && _checkAsset(link)){
       final byteData = await rootBundle.load(link);
@@ -100,19 +107,8 @@ class MediaDownloader {
   }
 
   // Get the file name
-  String _fileName(String link) {
-    final path = Uri.parse(link).pathSegments.last;
-
-    final extensionIndex = path.lastIndexOf('.');
-    final name = extensionIndex == -1
-        ? path
-        : path.substring(0, extensionIndex);
-
-    try {
-      return Uri.decodeComponent(name);
-    } catch (_) {
-      return name;
-    }
+  String _getFileExtension(String url) {
+    return url.split('.').last;
   }
 
   // Check if video is a link
