@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:math';
+import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -8,7 +8,6 @@ import 'package:flutter_video_test/media_cacher_stub.dart'
     if (dart.library.js_interop) 'package:flutter_video_test/media_cacher.dart';
 import 'package:video_player/video_player.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
-import 'package:web_browser_detect/web_browser_detect.dart';
 
 import 'media_link.dart';
 import 'media_sources.dart';
@@ -27,15 +26,18 @@ class _VideoAppState extends State<VideoApp> {
   final MediaCacher _mediaCacher = MediaCacher();
   final ApiCall _apiCall = ApiCall();
   List<MediaLink> _mediaLinks = [];
+  List<MediaLink> _mediaLinksFrame = [];
 
   // Testing
   bool _initialPlaylistActive = true;
 
   String? _imagePath;
-  ImageProvider? _activeImageProvider;
+  String? _framePath;
   String? _videoPath;
   VideoPlayerController? _controller;
   Timer? _imageTimer;
+  Timer? _frameTimer;
+  ImageProvider? _activeImageProvider;
   String? _imageError;
   String? _videoError;
   bool _isChangingVideo = false;
@@ -44,6 +46,7 @@ class _VideoAppState extends State<VideoApp> {
   bool _changingPlaylist = false;
   String? _preloadError;
   int _currentLinkIndex = 0;
+  int _currentLinkIndexFrame = 0;
   Timer? _scheduleCheckTimer;
   Timer? _payloadCheckTimer;
   bool _checkSchedule = false;
@@ -51,16 +54,22 @@ class _VideoAppState extends State<VideoApp> {
   bool _isCheckingForChanges = false;
   bool _payloadCheckQueued = false;
 
-  Browser? _browser;
+  // Frame coordinates
+  double? x1;
+  double? y1;
+  double? x2;
+  double? y2;
 
   MediaLink? get _currentMedia =>
       _mediaLinks.isEmpty ? null : _mediaLinks[_currentLinkIndex];
+  MediaLink? get _currentMediaFrame =>
+      _mediaLinksFrame.isEmpty ? null : _mediaLinksFrame[_currentLinkIndexFrame];
 
   @override
   void initState() {
     super.initState();
     unawaited(WakelockPlus.enable());
-    unawaited(_prepareMedia(mediaLinks, startChangeChecks: true));
+    unawaited(_prepareMedia(mediaLinks, mediaLinksFrames, startChangeChecks: true));
   }
 
   // Check which webbrowser the user is using
@@ -73,14 +82,15 @@ class _VideoAppState extends State<VideoApp> {
   // Start Next Playlist
   Future<void> _startNextPlaylist() async {
     _currentLinkIndex = 0;
-    _prepareMedia(_initialPlaylistActive ? mediaLinksExtra : mediaLinks);
+    _prepareMedia(mediaLinks, mediaLinksFrames);
     _initialPlaylistActive = !_initialPlaylistActive;
     _changingPlaylist = false;
   }
 
   // Download the media given and initialize the first media.
   Future<void> _prepareMedia(
-    List<MediaLink> links, {
+    List<MediaLink> links,
+    List<MediaLink> frameLinks, {
     bool startChangeChecks = false,
   }) async {
     try {
@@ -95,10 +105,14 @@ class _VideoAppState extends State<VideoApp> {
       if (_mediaLinks.isEmpty) {
         _mediaLinks = await _apiCall.getMediaFromApi();
       }
+      _mediaLinksFrame = kIsWeb == true
+          ? List.of(frameLinks)
+          : await _mediaDownloader.downloadAllMedia(links: frameLinks);
 
       _isPreparingMedia = false;
       if (mounted) setState(() {});
       await _initializeMedia();
+      await _initializeFrame();
       if (startChangeChecks) {
         _startChangeChecks();
       }
@@ -219,8 +233,6 @@ class _VideoAppState extends State<VideoApp> {
       return;
     }
 
-    _checkForWebBrowser();
-
     // Use file path if not on web and
     //  use url if on web.
     VideoPlayerController controller;
@@ -267,6 +279,57 @@ class _VideoAppState extends State<VideoApp> {
     }
   }
 
+  Future<void> _initializeFrame() async {
+    final mediaFrame = _currentMediaFrame;
+
+    if (mediaFrame == null) {
+      _updateFrameCoordinates(null);
+      return;
+    }
+    _updateFrameCoordinates(mediaFrame.link);
+    if (mediaFrame.type == 'image') {
+      _framePath = kIsWeb ? null : mediaFrame.link;
+
+      if (!mounted) return;
+      setState(() {});
+      _frameTimer = Timer(
+        Duration(milliseconds: (mediaFrame.duration ?? 5000).round()),
+        _playNextFrame,
+      );
+      return;
+    }
+  }
+
+  void _updateFrameCoordinates(String? link) {
+    final decodedLink = link == null ? '' : Uri.decodeComponent(link);
+
+    double? readCoordinate(String name) {
+      final match = RegExp(
+        '\\b$name\\s*=\\s*(-?\\d+(?:\\.\\d+)?)',
+        caseSensitive: false,
+      ).firstMatch(decodedLink);
+      return match == null ? null : double.tryParse(match.group(1)!);
+    }
+
+    final nextX1 = readCoordinate('X1');
+    final nextY1 = readCoordinate('Y1');
+    final nextX2 = readCoordinate('X2');
+    final nextY2 = readCoordinate('Y2');
+
+    if (nextX1 == null || nextY1 == null || nextX2 == null || nextY2 == null) {
+      x1 = null;
+      y1 = null;
+      x2 = null;
+      y2 = null;
+      return;
+    }
+
+    x1 = nextX1;
+    y1 = nextY1;
+    x2 = nextX2;
+    y2 = nextY2;
+  }
+
   // Handle video state changes
   //  and play next media if video is finished.
   void _handleVideoState() {
@@ -295,6 +358,14 @@ class _VideoAppState extends State<VideoApp> {
     _mediaLinks.removeAt(_currentLinkIndex);
     _currentLinkIndex -= 1;
     _playNextMedia();
+  }
+
+  // Skip current media because of error
+  // // Remove media from list
+  void _skipFrame() {
+    _mediaLinksFrame.removeAt(_currentLinkIndexFrame);
+    _currentLinkIndexFrame -= 1;
+    _playNextFrame();
   }
 
   // Play next media.
@@ -464,6 +535,17 @@ class _VideoAppState extends State<VideoApp> {
     }
   }
 
+  Future<void> _playNextFrame() async {
+    if (_mediaLinksFrame.isEmpty) return;
+
+    _frameTimer?.cancel();
+    _frameTimer = null;
+    _currentLinkIndexFrame = (_currentLinkIndexFrame + 1) % _mediaLinksFrame.length;
+    _framePath = null;
+
+    await _initializeFrame();
+  }
+
   // Widget to display the app
   @override
   Widget build(BuildContext context) {
@@ -471,26 +553,62 @@ class _VideoAppState extends State<VideoApp> {
       title: 'Video Demo',
       theme: ThemeData(scaffoldBackgroundColor: Colors.black),
       home: Scaffold(
-        body: Stack(
-          alignment: Alignment.center,
-          children: [
-            Center(child: _buildMedia()),
-            _buildStartButton(),
-            Positioned(
-              right: 16,
-              bottom: 16,
-              child: _buildNextPlaylistButton(),
-            ),
-            // if (kIsWeb)
-            //   Column(
-            //     mainAxisAlignment: MainAxisAlignment.center,
-            //     mainAxisSize: MainAxisSize.min,
-            //     children: [
-            //       Text('Browser is ${_browser?.browser ?? 'Not on web'}'),
-            //       Text('Version is ${_browser?.version ?? 'Not on web'}'),
-            //     ],
-            //   ),
-          ],
+        body: LayoutBuilder(
+          builder: (context, constraints) {
+            const canvasWidth = 1920.0;
+            const canvasHeight = 1080.0;
+            final scale = math.min(
+              constraints.maxWidth / canvasWidth,
+              constraints.maxHeight / canvasHeight,
+            );
+
+            return Stack(
+              alignment: Alignment.center,
+              children: [
+                if (x1 != null)
+                  Center(
+                    child: SizedBox(
+                      width: canvasWidth * scale,
+                      height: canvasHeight * scale,
+                      child: Stack(
+                        children: [
+                          Positioned(
+                            left: x1! * scale,
+                            top: y1! * scale,
+                            width: (x2! - x1!) * scale,
+                            height: (y2! - y1!) * scale,
+                            child: ClipRect(child: _buildMedia()),
+                          ),
+                          _buildMediaFrame(),
+                        ],
+                      ),
+                    ),
+                  )
+                else
+                  Center(child: _buildMedia()),
+                _buildStartButton(),
+                Positioned(
+                  right: 16,
+                  bottom: 16,
+                  child: _buildNextPlaylistButton(),
+                ),  
+                // Positioned(
+                //   right: 16,
+                //   bottom: 16,
+                //   child: _buildNextPlaylistButton(),
+                // ),
+                // if (kIsWeb)
+                //   Column(
+                //     mainAxisAlignment: MainAxisAlignment.center,
+                //     mainAxisSize: MainAxisSize.min,
+                //     children: [
+                //       Text('Browser is ${_browser?.browser ?? 'Not on web'}'),
+                //       Text('Version is ${_browser?.version ?? 'Not on web'}'),
+                //     ],
+                //   ),
+              ],
+            );
+          },
         ),
       ),
     );
@@ -562,6 +680,58 @@ class _VideoAppState extends State<VideoApp> {
           ? const CircularProgressIndicator()
           : Image.file(
               File(_imagePath!),
+              fit: BoxFit.contain,
+              height: double.infinity,
+              width: double.infinity,
+            );
+    }
+
+    return _controller?.value.isInitialized ?? false
+        ? AspectRatio(
+            aspectRatio: _controller!.value.aspectRatio,
+            child: VideoPlayer(_controller!),
+          )
+        : const CircularProgressIndicator();
+  }
+
+  Widget _buildMediaFrame() {
+    if (_isPreparingMedia) {
+      return const CircularProgressIndicator();
+    }
+    if (_preloadError != null) {
+      return Padding(
+        padding: const EdgeInsets.all(24),
+        child: Text(
+          'Could not download media:\n$_preloadError',
+          textAlign: TextAlign.center,
+        ),
+      );
+    }
+
+    if (_mediaLinksFrame.isEmpty) {
+      return Image.asset(
+        'assets/placeholder.png',
+        fit: BoxFit.contain,
+        height: double.infinity,
+        width: double.infinity,
+      );
+    }
+
+    final media = _currentMediaFrame!;
+
+    if (media.type == 'image') {
+      if (kIsWeb) {
+        return Image.network(
+          media.link,
+          fit: BoxFit.contain,
+          height: double.infinity,
+          width: double.infinity,
+        );
+      }
+      return _framePath == null
+          ? const CircularProgressIndicator()
+          : Image.file(
+              File(_framePath!),
               fit: BoxFit.contain,
               height: double.infinity,
               width: double.infinity,
@@ -650,6 +820,8 @@ class _VideoAppState extends State<VideoApp> {
   @override
   void dispose() {
     _imageTimer?.cancel();
+    _frameTimer?.cancel();
+    _controller?.dispose();
     _scheduleCheckTimer?.cancel();
     _payloadCheckTimer?.cancel();
     final controller = _controller;
