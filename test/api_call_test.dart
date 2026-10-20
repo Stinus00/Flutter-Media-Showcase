@@ -108,6 +108,7 @@ void main() {
     test('does not include a schedule', () {
       final activeSlides = apiCall.getActiveGroupSchedules(
         decodeScheduleResponse(),
+        'slides',
         DateTime(2026, 10, 6, 9),
       );
 
@@ -121,6 +122,7 @@ void main() {
     test('includes schedules active during their recurring time window', () {
       final activeSlides = apiCall.getActiveSystemSchedules(
         decodeScheduleResponse(),
+        'slides',
         DateTime(2026, 10, 6, 9),
       );
 
@@ -130,6 +132,7 @@ void main() {
     test('excludes recurrence exception dates', () {
       final activeSlides = apiCall.getActiveSystemSchedules(
         decodeScheduleResponse(),
+        'slides',
         DateTime(2026, 10, 7, 9),
       );
 
@@ -139,6 +142,7 @@ void main() {
     test('does not include a schedule at its end time', () {
       final activeSlides = apiCall.getActiveSystemSchedules(
         decodeScheduleResponse(),
+        'slides',
         DateTime(2026, 10, 7, 18),
       );
 
@@ -148,11 +152,13 @@ void main() {
     test('exception moved', () {
       final activeSlides = apiCall.getActiveSystemSchedules(
         decodeScheduleResponse(),
+        'slides',
         DateTime(2026, 10, 8, 8, 30),
       );
 
       final inactiveSlides = apiCall.getActiveSystemSchedules(
         decodeScheduleResponse(),
+        'slides',
         DateTime(2026, 10, 8, 8),
       );
 
@@ -163,11 +169,13 @@ void main() {
     test('includes a one-off schedule only inside its start/end window', () {
       final activeSlides = apiCall.getActiveSystemSchedules(
         decodeScheduleResponse(),
+        'slides',
         DateTime(2026, 10, 8, 8, 30),
       );
 
       final expiredSlides = apiCall.getActiveSystemSchedules(
         decodeScheduleResponse(),
+        'slides',
         DateTime(2026, 10, 8, 18, 28, 48),
       );
 

@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/services.dart';
+import 'package:flutter_video_test/frame_link.dart';
 import 'package:flutter_video_test/media_link.dart';
 
 import 'package:dio/dio.dart';
@@ -15,30 +16,63 @@ class MediaDownloader {
   }
 
   // Download all media gathered from media_sources
-  Future<List<MediaLink>> downloadAllMedia({
-    required List<MediaLink> links,
+  Future<List<dynamic>> downloadAllMedia({
+    required List<dynamic> links,
   }) async {
-    final downloadedLinks = <MediaLink>[];
+    final downloadedLinks = <dynamic>[];
 
     for (final media in links) {
-      final path = media.type == 'image'
-          ? await _downloadImage(link: media.link, name: media.id!)
-          : await _downloadVideo(link: media.link, name: media.id!);
-
-      if(path == '') {
-        continue;
+      var path = '';
+      switch (media.type) {
+        case 'image':
+          path = await _downloadImage(link: media.link, name: media.id!);
+          if (path == '') break;
+          downloadedLinks.add(
+            MediaLink(
+              id: media.id,
+              link: media.link,
+              type: media.type,
+              duration: media.duration,
+              mimeType: media.mimeType,
+              localPath: path,
+            ),
+          );
+          break;
+        case 'video':
+          path = await _downloadVideo(link: media.link, name: media.id!);
+          if (path == '') break;
+          downloadedLinks.add(
+            MediaLink(
+              id: media.id,
+              link: media.link,
+              type: media.type,
+              duration: media.duration,
+              mimeType: media.mimeType,
+              localPath: path,
+            ),
+          );
+          break;
+        case 'frame':
+          path = await _downloadFrame(link: media.link, name: media.id!);
+          if (path == '') break;
+          downloadedLinks.add(
+            FrameLink(
+              id: media.id,
+              link: media.link,
+              type: media.type,
+              duration: media.duration,
+              mimeType: media.mimeType,
+              localPath: path,
+              x1: media.x1,
+              y1: media.y1,
+              x2: media.x2,
+              y2: media.y2
+            ),
+          );
+          break;
+        default:
+          break;
       }
-
-      downloadedLinks.add(
-        MediaLink(
-          id: media.id,
-          link: media.link,
-          type: media.type,
-          duration: media.duration,
-          mimeType: media.mimeType,
-          localPath: path,
-        ),
-      );
     }
 
     return downloadedLinks;
@@ -93,6 +127,32 @@ class MediaDownloader {
     try {
       if (!await file.exists()) {
         await videoDirectory.create(recursive: true);
+        await _dio.download(
+          link,
+          file.path,
+          onReceiveProgress: onReceiveProgress,
+        );
+      }
+    } catch (e) {
+      return '';
+    }
+
+    return file.path;
+  }
+
+  // Start download on image
+  Future<String> _downloadFrame({
+    required String link,
+    required String name,
+    void Function(int received, int total)? onReceiveProgress,
+  }) async {
+    final directory = await downloadDirectory;
+    final frameDirectory = Directory('${directory.path}/frames');
+    final file = File('${frameDirectory.path}/$name.${_getFileExtension(link)}');
+
+    try {
+      if (!await file.exists()) {
+        await frameDirectory.create(recursive: true);
         await _dio.download(
           link,
           file.path,

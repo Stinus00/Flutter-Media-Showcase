@@ -1,3 +1,5 @@
+import 'package:flutter_video_test/frame_link.dart';
+
 import 'media_link.dart';
 
 // Temporary links for testing
@@ -93,12 +95,12 @@ const List <MediaLink> mediaLinks = [
   ),
 ];
 
-const List<MediaLink> mediaLinksFrames = [
+const List<FrameLink> mediaLinksFrames = [
   // MediaLink(link:'https://s3.eu-central-003.backblazeb2.com/bcmdatabucket1/graphics/templateimages_n/0010/ftp_0042%20X1=275%20Y1=154%20X2=1645%20Y2=926.png', type: 'image', duration: 10000),
-  MediaLink(link:'https://s3.eu-central-003.backblazeb2.com/bcmdatabucket1/graphics/templateimages_n/0010/ftp_0043%20X1=275%20Y1=154%20X2=1645%20Y2=926.png', type:'image', duration:15000, id: 'name1'),
-  MediaLink(link:'https://s3.eu-central-003.backblazeb2.com/bcmdatabucket1/graphics/templateimages_n/0037/ftp_0270%20X1%3D477%20Y1%3D154%20X2%3D1847%20Y2%3D926.png', type:'image', duration:15000, id: 'name2'),
-  MediaLink(link:'https://s3.eu-central-003.backblazeb2.com/bcmdatabucket1/graphics/templateimages_n/0010/ftp_0045%20X1=275%20Y1=154%20X2=1645%20Y2=926.png', type:'image', duration:15000, id: 'name3'),
-  MediaLink(link:'https://s3.eu-central-003.backblazeb2.com/bcmdatabucket1/graphics/templateimages_n/0037/ftp_0271%20X1%3D477%20Y1%3D154%20X2%3D1847%20Y2%3D926.png', type:'image', duration:15000, id: 'name4'),
+  FrameLink(link:'https://s3.eu-central-003.backblazeb2.com/bcmdatabucket1/graphics/templateimages_n/0010/ftp_0043%20X1=275%20Y1=154%20X2=1645%20Y2=926.png', duration:15000, id: 'name1', type: 'frame', x1: 275, y1: 154, x2: 1645, y2:926),
+  FrameLink(link:'https://s3.eu-central-003.backblazeb2.com/bcmdatabucket1/graphics/templateimages_n/0037/ftp_0270%20X1%3D477%20Y1%3D154%20X2%3D1847%20Y2%3D926.png', duration:15000, id: 'name2', type: 'frame', x1: 477, y1: 154, x2: 1847, y2:926),
+  FrameLink(link:'https://s3.eu-central-003.backblazeb2.com/bcmdatabucket1/graphics/templateimages_n/0010/ftp_0045%20X1=275%20Y1=154%20X2=1645%20Y2=926.png', duration:15000, id: 'name3', type: 'frame', x1: 275, y1: 154, x2: 1645, y2:926),
+  FrameLink(link:'https://s3.eu-central-003.backblazeb2.com/bcmdatabucket1/graphics/templateimages_n/0037/ftp_0271%20X1%3D477%20Y1%3D154%20X2%3D1847%20Y2%3D926.png', duration:15000, id: 'name4', type: 'frame', x1: 477, y1: 154, x2: 1847, y2:926),
   // MediaLink(link:'https://s3.eu-central-003.backblazeb2.com/bcmdatabucket1/graphics/templateimages_n/0010/ftp_0046%20X1=275%20Y1=154%20X2=1645%20Y2=926.png', type:'image',duration:4000),
   // MediaLink(link:'https://s3.eu-central-003.backblazeb2.com/bcmdatabucket1/graphics/templateimages_n/0010/ftp_0047%20X1=275%20Y1=154%20X2=1645%20Y2=926.png', type:'image',duration:4000),
   // MediaLink(link:'https://s3.eu-central-003.backblazeb2.com/bcmdatabucket1/graphics/templateimages_n/0037/ftp_0272%20X1%3D73%20Y1%3D235%20X2%3D1443%20Y2%3D1007.png', type:'image', duration:4000),
