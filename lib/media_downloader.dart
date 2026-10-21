@@ -26,6 +26,7 @@ class MediaDownloader {
       switch (media.type) {
         case 'image':
           path = await _downloadImage(link: media.link, name: media.id!);
+          if (path == '') break;
           downloadedLinks.add(
             MediaLink(
               id: media.id,
@@ -39,6 +40,7 @@ class MediaDownloader {
           break;
         case 'video':
           path = await _downloadVideo(link: media.link, name: media.id!);
+          if (path == '') break;
           downloadedLinks.add(
             MediaLink(
               id: media.id,
@@ -52,6 +54,7 @@ class MediaDownloader {
           break;
         case 'frame':
           path = await _downloadFrame(link: media.link, name: media.id!);
+          if (path == '') break;
           downloadedLinks.add(
             FrameLink(
               id: media.id,
@@ -66,6 +69,7 @@ class MediaDownloader {
           );
           break;
         default:
+          break;
       }
     }
     return downloadedLinks;
@@ -140,12 +144,12 @@ class MediaDownloader {
     void Function(int received, int total)? onReceiveProgress,
   }) async {
     final directory = await downloadDirectory;
-    final imageDirectory = Directory('${directory.path}/frames');
-    final file = File('${imageDirectory.path}/$name.${_getFileExtension(link)}');
+    final frameDirectory = Directory('${directory.path}/frames');
+    final file = File('${frameDirectory.path}/$name.${_getFileExtension(link)}');
 
     try {
       if (!await file.exists()) {
-        await imageDirectory.create(recursive: true);
+        await frameDirectory.create(recursive: true);
         await _dio.download(
           link,
           file.path,

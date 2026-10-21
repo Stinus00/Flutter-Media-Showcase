@@ -1,4 +1,5 @@
 import 'package:flutter/services.dart';
+import 'package:flutter_video_test/frame_link.dart';
 import 'package:flutter_video_test/media_link.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 
@@ -34,9 +35,16 @@ class MediaCacher {
           db.deleteObjectStore('videos');
         }
         db.createObjectStore('videos');
-        if (!db.objectStoreNames.contains('images')) {
-          db.createObjectStore('images', autoIncrement: true);
+
+        if (db.objectStoreNames.contains('images')) {
+          db.deleteObjectStore('images');
         }
+        db.createObjectStore('images');
+
+        if (db.objectStoreNames.contains('frames')) {
+          db.deleteObjectStore('frames');
+        }
+        db.createObjectStore('frames');
       },
     );
 
@@ -44,45 +52,67 @@ class MediaCacher {
   }
 
   // Go through the list to download/cache all media.
-  Future<List<MediaLink>> cacheAllMedia({
-    required List<MediaLink> links,
+  Future<List<dynamic>> cacheAllMedia({
+    required List<dynamic> links,
   }) async {
-    final downloadedLinks = <MediaLink>[];
+    final downloadedLinks = <dynamic>[];
     DefaultCacheManager().emptyCache();
 
     for (final media in links) {
-      final path = media.type == 'image'
-          ? await _cacheWebImage(_getTemporaryId(media.link), media.link, null)
-          : await _cacheWebVideo(_getTemporaryId(media.link), media.link, null);
-
-      downloadedLinks.add(
-        MediaLink(
-          link: media.link,
-          type: media.type,
-          duration: media.duration,
-          blobUrl: path,
-          id: _getTemporaryId(media.link),
-        ),
-      );
+      var path = '';
+      switch (media.type) {
+        case 'image':
+          path = await _cacheWebImage(media.id, media.link, null);
+          if (path == '') break;
+          downloadedLinks.add(
+            MediaLink(
+              id: media.id,
+              link: media.link,
+              type: media.type,
+              duration: media.duration,
+              mimeType: media.mimeType,
+              blobUrl: path,
+            ),
+          );
+          break;
+        case 'video':
+          path = await _cacheWebVideo(media.id, media.link, null);
+          if (path == '') break;
+          downloadedLinks.add(
+            MediaLink(
+              id: media.id,
+              link: media.link,
+              type: media.type,
+              duration: media.duration,
+              mimeType: media.mimeType,
+              blobUrl: path,
+            ),
+          );
+          break;
+        case 'frame':
+          path = await _cacheWebFrame(media.id, media.link, null);
+          if (path == '') break;
+          downloadedLinks.add(
+            FrameLink(
+              id: media.id,
+              link: media.link,
+              type: media.type,
+              duration: media.duration,
+              mimeType: media.mimeType,
+              blobUrl: path,
+              x1: media.x1,
+              y1: media.y1,
+              x2: media.x2,
+              y2: media.y2
+            ),
+          );
+          break;
+        default:
+          break;
+      }
     }
 
     return downloadedLinks;
-  }
-
-  // Give the name of the file back as id.
-  String _getTemporaryId(String link) {
-    final path = Uri.parse(link).pathSegments.last;
-
-    final extensionIndex = path.lastIndexOf('.');
-    final name = extensionIndex == -1
-        ? path
-        : path.substring(0, extensionIndex);
-
-    try {
-      return Uri.decodeComponent(name);
-    } catch (_) {
-      return name;
-    }
   }
 
   // Turn the bytes into a blob.
@@ -96,54 +126,6 @@ class MediaCacher {
     );
 
     return web.URL.createObjectURL(blob);
-  }
-
-  // Put video into IndexedDB
-  // // Change to download to cache.
-  // // Out of memory issue encountered on Firestick.
-  Future<String> _cacheWebVideo(
-    String videoId,
-    String url,
-    void Function(double progress)? onProgress,
-  ) async {
-    // Check if video exists
-    // If exists skip download part
-    if (await containsMediaWeb('videos', videoId)) {
-      final bytes = await getMediaWeb('videos', videoId);
-      if (bytes != null && bytes.isNotEmpty) {
-        return url;
-      }
-    }
-
-    try {
-      // Get video in bytes
-      final response = await Dio().get<List<int>>(
-        url,
-        options: Options(
-          responseType: ResponseType.bytes,
-        ), // Set the response type to `bytes`.
-      );
-
-      if (response.statusCode != 200 || response.data == null) {
-        throw Exception('[media_downloader.dart] Failed to download video');
-      }
-
-      final bytes = Uint8List.fromList(response.data!);
-
-      final db = await database;
-
-      final txn = db.transaction('videos', idbModeReadWrite);
-      final store = txn.objectStore('videos');
-
-      await store.put({'bytes': bytes}, videoId);
-
-      await txn.completed;
-    } catch (e) {
-      log('Error caching video: $e');
-      rethrow;
-    }
-
-    return url; // Return the video ID for retrieval later
   }
 
   Future<String> loadVideoBlobUrlFromIndexedDB(String id) async {
@@ -195,6 +177,54 @@ class MediaCacher {
     }
   }
 
+  // Put video into IndexedDB
+  // // Change to download to cache.
+  // // Out of memory issue encountered on Firestick.
+  Future<String> _cacheWebVideo(
+    String videoId,
+    String url,
+    void Function(double progress)? onProgress,
+  ) async {
+    // Check if video exists
+    // If exists skip download part
+    if (await containsMediaWeb('videos', videoId)) {
+      final bytes = await getMediaWeb('videos', videoId);
+      if (bytes != null && bytes.isNotEmpty) {
+        return url;
+      }
+    }
+
+    try {
+      // Get video in bytes
+      final response = await Dio().get<List<int>>(
+        url,
+        options: Options(
+          responseType: ResponseType.bytes,
+        ), // Set the response type to `bytes`.
+      );
+
+      if (response.statusCode != 200 || response.data == null) {
+        throw Exception('[media_downloader.dart] Failed to download video');
+      }
+
+      final bytes = Uint8List.fromList(response.data!);
+
+      final db = await database;
+
+      final txn = db.transaction('videos', idbModeReadWrite);
+      final store = txn.objectStore('videos');
+
+      await store.put({'bytes': bytes}, videoId);
+
+      await txn.completed;
+    } catch (e) {
+      log('Error caching video: $e');
+      rethrow;
+    }
+
+    return url; // Return the video ID for retrieval later
+  }
+
   // Put image into IndexedDB
   Future<String> _cacheWebImage(
     String imageId,
@@ -219,7 +249,7 @@ class MediaCacher {
     );
 
     if (response.statusCode != 200 || response.data == null) {
-      throw Exception('[media_downloader.dart] Failed to download image');
+      throw Exception('[media_downloader.dart] Failed to download frame');
     }
 
     final bytes = Uint8List.fromList(response.data!);
@@ -230,6 +260,47 @@ class MediaCacher {
     final store = txn.objectStore('images');
 
     await store.put({'bytes': bytes}, imageId);
+
+    await txn.completed;
+
+    return url; // Return the image url for retrieval later
+  }
+
+  // Put image into IndexedDB
+  Future<String> _cacheWebFrame(
+    String frameId,
+    String url,
+    void Function(double progress)? onProgress,
+  ) async {
+    // Check if image exists in database.
+    // If it does skip download part.
+    if (await containsMediaWeb('frames', frameId)) {
+      final bytes = await getMediaWeb('frames', frameId);
+      if (bytes != null) {
+        return url;
+      }
+    }
+
+    // Get image in bytes format.
+    final response = await Dio().get<List<int>>(
+      url,
+      options: Options(
+        responseType: ResponseType.bytes,
+      ), // Set the response type to `bytes`.
+    );
+
+    if (response.statusCode != 200 || response.data == null) {
+      throw Exception('[media_downloader.dart] Failed to download image');
+    }
+
+    final bytes = Uint8List.fromList(response.data!);
+
+    final db = await database;
+
+    final txn = db.transaction('frames', idbModeReadWrite);
+    final store = txn.objectStore('frames');
+
+    await store.put({'bytes': bytes}, frameId);
 
     await txn.completed;
 
