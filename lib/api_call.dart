@@ -373,7 +373,7 @@ class ApiCall {
     if(kIsWeb) {
       return await _cacher.cacheAllMedia(links: media);
     } else {
-      return await _downloader.downloadAllMedia(links: media);
+      return await _downloader.downloadAllMedia(links: media) as List<MediaLink>;
     }
   }
 

@@ -4,6 +4,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_video_test/frame_link.dart';
 import 'package:flutter_video_test/media_cacher_stub.dart'
     if (dart.library.js_interop) 'package:flutter_video_test/media_cacher.dart';
 import 'package:flutter_video_test/media_downloader.dart';
@@ -28,7 +29,7 @@ class _VideoAppState extends State<VideoApp> {
   final ApiCall _apiCall = ApiCall();
   final MediaDownloader _mediaDownloader = MediaDownloader();
   List<MediaLink> _mediaLinks = [];
-  List<MediaLink> _mediaLinksFrame = [];
+  List<FrameLink> _mediaLinksFrame = [];
 
   // Testing
   bool _initialPlaylistActive = true;
@@ -61,10 +62,11 @@ class _VideoAppState extends State<VideoApp> {
   double? y1;
   double? x2;
   double? y2;
+  String? creationType;
 
   MediaLink? get _currentMedia =>
       _mediaLinks.isEmpty ? null : _mediaLinks[_currentLinkIndex];
-  MediaLink? get _currentMediaFrame =>
+  FrameLink? get _currentMediaFrame =>
       _mediaLinksFrame.isEmpty ? null : _mediaLinksFrame[_currentLinkIndexFrame];
 
   @override
@@ -85,7 +87,7 @@ class _VideoAppState extends State<VideoApp> {
   // Download the media given and initialize the first media.
   Future<void> _prepareMedia(
     List<MediaLink> links,
-    List<MediaLink> frameLinks, {
+    List<FrameLink> frameLinks, {
     bool startChangeChecks = false,
   }) async {
     try {
@@ -102,7 +104,7 @@ class _VideoAppState extends State<VideoApp> {
       }
       _mediaLinksFrame = kIsWeb == true
           ? List.of(frameLinks)
-          : await _mediaDownloader.downloadAllMedia(links: frameLinks);
+          : await _mediaDownloader.downloadAllMedia(links: frameLinks) as List<FrameLink>;
 
       _isPreparingMedia = false;
       if (mounted) setState(() {});
@@ -281,8 +283,8 @@ class _VideoAppState extends State<VideoApp> {
       _updateFrameCoordinates(null);
       return;
     }
-    _updateFrameCoordinates(mediaFrame.link);
-    if (mediaFrame.type == 'image') {
+    _updateFrameCoordinates(mediaFrame);
+    if (mediaFrame.type == 'frame') {
       _framePath = kIsWeb ? null : mediaFrame.localPath;
 
       if (!mounted) return;
@@ -295,34 +297,12 @@ class _VideoAppState extends State<VideoApp> {
     }
   }
 
-  void _updateFrameCoordinates(String? link) {
-    final decodedLink = link == null ? '' : Uri.decodeComponent(link);
-
-    double? readCoordinate(String name) {
-      final match = RegExp(
-        '\\b$name\\s*=\\s*(-?\\d+(?:\\.\\d+)?)',
-        caseSensitive: false,
-      ).firstMatch(decodedLink);
-      return match == null ? null : double.tryParse(match.group(1)!);
-    }
-
-    final nextX1 = readCoordinate('X1');
-    final nextY1 = readCoordinate('Y1');
-    final nextX2 = readCoordinate('X2');
-    final nextY2 = readCoordinate('Y2');
-
-    if (nextX1 == null || nextY1 == null || nextX2 == null || nextY2 == null) {
-      x1 = null;
-      y1 = null;
-      x2 = null;
-      y2 = null;
-      return;
-    }
-
-    x1 = nextX1;
-    y1 = nextY1;
-    x2 = nextX2;
-    y2 = nextY2;
+  void _updateFrameCoordinates(FrameLink? frame) {
+    x1 = frame?.x1;
+    y1 = frame?.y1;
+    x2 = frame?.x2;
+    y2 = frame?.y2;
+    creationType = frame?.creationType;
   }
 
   // Handle video state changes
@@ -567,6 +547,7 @@ class _VideoAppState extends State<VideoApp> {
                       height: canvasHeight * scale,
                       child: Stack(
                         children: [
+                          _buildMediaFrame(),
                           Positioned(
                             left: x1! * scale,
                             top: y1! * scale,
@@ -574,7 +555,8 @@ class _VideoAppState extends State<VideoApp> {
                             height: (y2! - y1!) * scale,
                             child: ClipRect(child: _buildMedia()),
                           ),
-                          _buildMediaFrame(),
+                          if(creationType == 'bcm')
+                            _buildMediaFrame(), 
                         ],
                       ),
                     ),
@@ -714,7 +696,7 @@ class _VideoAppState extends State<VideoApp> {
 
     final media = _currentMediaFrame!;
 
-    if (media.type == 'image') {
+    if (media.type == 'frame') {
       if (kIsWeb) {
         return Image.network(
           media.link,
