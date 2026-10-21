@@ -63,10 +63,8 @@ class MediaDownloader {
               duration: media.duration,
               mimeType: media.mimeType,
               localPath: path,
-              x1: media.x1,
-              y1: media.y1,
-              x2: media.x2,
-              y2: media.y2
+              creationType: media.creationType,
+              x1: media.x1, x2: media.x2, y1: media.y1, y2: media.y2,
             ),
           );
           break;
@@ -74,7 +72,6 @@ class MediaDownloader {
           break;
       }
     }
-
     return downloadedLinks;
   }
 
@@ -140,7 +137,7 @@ class MediaDownloader {
     return file.path;
   }
 
-  // Start download on image
+  // Start download on frame
   Future<String> _downloadFrame({
     required String link,
     required String name,

@@ -61,6 +61,7 @@ class _VideoAppState extends State<VideoApp> {
   double? y1;
   double? x2;
   double? y2;
+  String? creationType;
 
   MediaLink? get _currentMedia =>
       _mediaLinks.isEmpty ? null : _mediaLinks[_currentLinkIndex];
@@ -299,6 +300,7 @@ class _VideoAppState extends State<VideoApp> {
     y1 = frame?.y1;
     x2 = frame?.x2;
     y2 = frame?.y2;
+    creationType = frame?.creationType;
   }
 
   // Handle video state changes
@@ -545,6 +547,7 @@ class _VideoAppState extends State<VideoApp> {
                       height: canvasHeight * scale,
                       child: Stack(
                         children: [
+                          _buildMediaFrame(),
                           Positioned(
                             left: x1! * scale,
                             top: y1! * scale,
@@ -552,7 +555,8 @@ class _VideoAppState extends State<VideoApp> {
                             height: (y2! - y1!) * scale,
                             child: ClipRect(child: _buildMedia()),
                           ),
-                          _buildMediaFrame(),
+                          if(creationType == 'bcm')
+                            _buildMediaFrame(), 
                         ],
                       ),
                     ),
