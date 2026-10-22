@@ -21,6 +21,7 @@ dependencies:
   wakelock_plus: ^1.8.0
   web: ^1.1.1
   web_browser_detect: ^2.3.0
+  xml: ^7.1.0
 
 dev_dependencies:
   flutter_test:

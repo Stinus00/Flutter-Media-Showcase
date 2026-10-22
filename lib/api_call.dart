@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_video_test/api_mcc_data.dart';
+import 'package:flutter_video_test/api_xml_handler.dart';
 import 'package:flutter_video_test/frame_link.dart';
 import 'package:flutter_video_test/media_cacher_stub.dart'
     if (dart.library.js_interop) 'package:flutter_video_test/media_cacher.dart';
@@ -14,14 +15,16 @@ import 'package:intl/intl.dart';
 import 'package:teno_rrule/teno_rrule.dart';
 
 class ApiCall {
-  ApiCall({Dio? dio, MediaDownloader? downloader, MediaCacher? cacher})
+  ApiCall({Dio? dio, MediaDownloader? downloader, MediaCacher? cacher, ApiXmlHandler? apiXmlHandler})
     : _dio = dio ?? Dio(),
       _downloader = downloader ?? MediaDownloader(),
-      _cacher = cacher ?? MediaCacher();
+      _cacher = cacher ?? MediaCacher(),
+      _apiXmlHandler = apiXmlHandler ?? ApiXmlHandler();
 
   final Dio _dio;
   final MediaDownloader _downloader;
   final MediaCacher _cacher;
+  final ApiXmlHandler _apiXmlHandler;
 
   String? _currentResponseJson;
   String? _pendingResponseJson;
@@ -56,6 +59,7 @@ class ApiCall {
           ? await _getJsonFromUrl()
           : jsonDecode(responseJson) as Map<String, dynamic>;
       final jsonString = await _shortenJsonData(data);
+
       return await _buildFramesFromResponse(jsonString, now: DateTime.now());
     } catch (e) {
       debugPrint('Error fetching frames from API: $e');
@@ -483,10 +487,28 @@ class ApiCall {
       final url = item['image']['url'];
       final id = item['image']['id'];
       final mimeType = getMimeType(type, item);
-      int x1 = item['properties']['cutout']['x1'];
-      int y1 = item['properties']['cutout']['y1'];
-      int x2 = item['properties']['cutout']['x2'];
-      int y2 = item['properties']['cutout']['y2'];
+      final creationType = item['type'];
+      int x1 = 0;
+      int y1 = 0;
+      int x2 = 0;
+      int y2 = 0;
+
+      if(_apiXmlHandler.checkPropertyExists(item))
+      {
+        x1 = item['properties']['cutout']['x1'];
+        y1 = item['properties']['cutout']['y1'];
+        x2 = item['properties']['cutout']['x2'];
+        y2 = item['properties']['cutout']['y2'];
+      } else if(_apiXmlHandler.checkCoordsInLink(url)) {
+        (x1, y1, x2, y2) = _apiXmlHandler.extractAllQueryParams(url);
+      } 
+      else {
+        String? xmlUrl = await _apiXmlHandler.convertLinkToXMLString(url);
+        if(xmlUrl == null || xmlUrl.isEmpty) {
+          continue;
+        }
+        (x1, y1, x2, y2) = await _apiXmlHandler.getCoordinates(xmlUrl);
+      }
       
       frameLinks.add(
         FrameLink(
@@ -495,6 +517,7 @@ class ApiCall {
           duration: duration,
           id: id,
           mimeType: mimeType,
+          creationType: creationType,
           x1:x1.toDouble(),
           y1:y1.toDouble(),
           x2:x2.toDouble(),

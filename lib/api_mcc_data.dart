@@ -509,6 +509,7 @@ class Ticker {
 
 class FrameItem {
   final String id;
+  final String type;
   final MediaImage? image;
   final FrameProperties? properties;
   final String? datetimeStart;
@@ -517,6 +518,7 @@ class FrameItem {
 
   FrameItem({
     required this.id,
+    required this.type,
     required this.image,
     required this.properties,
     required this.datetimeStart,
@@ -527,6 +529,7 @@ class FrameItem {
   factory FrameItem.fromJson(Map<String, dynamic> json) {
     return FrameItem(
       id: json['id']?.toString() ?? '',
+      type: json['type']?.toString() ?? '',
       image: json['image'] != null
           ? MediaImage.fromJson(json['image'])
           : null,

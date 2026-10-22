@@ -288,10 +288,9 @@ class _VideoAppState extends State<VideoApp> {
 
     if (!mounted) return;
     setState(() {});
-    _frameTimer = Timer(
-      Duration(milliseconds: (mediaFrame.duration ?? 5000).round()),
-      _playNextFrame,
-    );
+    if (!kIsWeb || _hasStartedPlayback) {
+      _startFrameTimer(mediaFrame);
+    }
     return;
   }
 
@@ -323,6 +322,14 @@ class _VideoAppState extends State<VideoApp> {
     _imageTimer = Timer(
       Duration(milliseconds: (media.duration ?? 5000).round()),
       _playNextMedia,
+    );
+  }
+
+  void _startFrameTimer(FrameLink mediaFrame) {
+    _frameTimer?.cancel();
+    _frameTimer = Timer(
+      Duration(milliseconds: (mediaFrame.duration ?? 5000).round()),
+      _playNextFrame,
     );
   }
 
@@ -569,20 +576,6 @@ class _VideoAppState extends State<VideoApp> {
                   bottom: 16,
                   child: _buildNextPlaylistButton(),
                 ),
-                // Positioned(
-                //   right: 16,
-                //   bottom: 16,
-                //   child: _buildNextPlaylistButton(),
-                // ),
-                // if (kIsWeb)
-                //   Column(
-                //     mainAxisAlignment: MainAxisAlignment.center,
-                //     mainAxisSize: MainAxisSize.min,
-                //     children: [
-                //       Text('Browser is ${_browser?.browser ?? 'Not on web'}'),
-                //       Text('Version is ${_browser?.version ?? 'Not on web'}'),
-                //     ],
-                //   ),
               ],
             );
           },
@@ -748,6 +741,10 @@ class _VideoAppState extends State<VideoApp> {
                     _controller!.play();
                   }
                 });
+                final mediaFrame = _currentMediaFrame;
+                if (mediaFrame != null) {
+                  _startFrameTimer(mediaFrame);
+                }
               },
               icon: const Icon(Icons.play_arrow),
               label: const Text('Start'),
