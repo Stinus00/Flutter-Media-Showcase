@@ -51,9 +51,10 @@ class MediaCacher {
     DefaultCacheManager().emptyCache();
 
     for (final media in links) {
+      final mediaId = media.id ?? _getTemporaryId(media.link);
       final path = media.type == 'image'
-          ? await _cacheWebImage(_getTemporaryId(media.link), media.link, null)
-          : await _cacheWebVideo(_getTemporaryId(media.link), media.link, null);
+          ? await _cacheWebImage(mediaId, media.link, null)
+          : await _cacheWebVideo(mediaId, media.link, null);
 
       downloadedLinks.add(
         MediaLink(
@@ -61,7 +62,7 @@ class MediaCacher {
           type: media.type,
           duration: media.duration,
           blobUrl: path,
-          id: _getTemporaryId(media.link),
+          id: mediaId,
         ),
       );
     }
@@ -173,8 +174,8 @@ class MediaCacher {
     });
   }
 
-  // Get or create a blob URL for the given key. 
-  // // If the blob URL is already cached, return it. 
+  // Get or create a blob URL for the given key.
+  // // If the blob URL is already cached, return it.
   // // Otherwise, create a new blob URL using the provided `create` function and cache it.
   Future<String> _getOrCreateBlobUrl(
     String key,
@@ -284,5 +285,17 @@ class MediaCacher {
     await transaction.objectStore(store).delete(id);
 
     await transaction.completed;
+  }
+
+  Future<Set<String>> getMediaKeysWeb(String store) async {
+    final db = await database;
+    final transaction = db.transaction(store, idbModeReadOnly);
+    final keys = await transaction.objectStore(store).getAllKeys();
+    await transaction.completed;
+    return keys.whereType<String>().toSet();
+  }
+
+  void forgetBlobUrlWeb(String store, String id) {
+    _blobUrlCache.remove('$store:$id');
   }
 }

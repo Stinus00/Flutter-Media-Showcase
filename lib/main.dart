@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -91,7 +90,7 @@ class _VideoAppState extends State<VideoApp> {
 
       // if (kIsWeb) {
       //   _mediaLinks = await _mediaCacher.cacheAllMedia(links: mediaLinks);
-      // } else 
+      // } else
       if (_mediaLinks.isEmpty) {
         _mediaLinks = await _apiCall.getMediaFromApi();
       }
@@ -117,9 +116,9 @@ class _VideoAppState extends State<VideoApp> {
   void _startChangeChecks() {
     _scheduleCheckTimer ??= Timer.periodic(
       const Duration(minutes: 1),
-      (_) { 
+      (_) {
         _checkSchedule = true;
-        if(_mediaLinks.isEmpty) {
+        if (_mediaLinks.isEmpty) {
             unawaited(_prepareMedia(mediaLinks));
         }
       }
@@ -150,7 +149,10 @@ class _VideoAppState extends State<VideoApp> {
           ? await _apiCall.hasPayloadChanged()
           : false;
       final schedulesChanged = _apiCall.haveSchedulesChanged();
-      if (!payloadChanged && !schedulesChanged) return;
+      if (!payloadChanged && !schedulesChanged) {
+        await _apiCall.cleanupStoredMedia();
+        return;
+      }
 
       final updatedMediaLinks = await _apiCall
           .rebuildMediaForCurrentSchedules();
@@ -171,6 +173,11 @@ class _VideoAppState extends State<VideoApp> {
       if (!mounted) return;
       setState(() {});
       await _initializeMedia();
+      try {
+        await _apiCall.cleanupStoredMedia();
+      } catch (error) {
+        debugPrint('Error deleting stale media: $error');
+      }
     } catch (error) {
       debugPrint('Error checking for media changes: $error');
     } finally {
@@ -433,7 +440,7 @@ class _VideoAppState extends State<VideoApp> {
     _activeImageProvider = imageProvider;
     _videoPath = null;
     _isChangingVideo = false;
-    
+
     if(_checkSchedule) {
       await _checkForMediaChanges();
       _checkSchedule = false;
@@ -536,7 +543,7 @@ class _VideoAppState extends State<VideoApp> {
       );
     }
 
-    if (_mediaLinks.isEmpty) {
+    if(_mediaLinks.isEmpty) {
       return Image.asset(
         'assets/placeholder-green.png',
         fit: BoxFit.contain,

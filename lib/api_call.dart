@@ -5,8 +5,10 @@ import 'package:flutter/foundation.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_video_test/api_mcc_data.dart';
+import 'package:flutter_video_test/media_cache_deletion.dart';
 import 'package:flutter_video_test/media_cacher_stub.dart'
     if (dart.library.js_interop) 'package:flutter_video_test/media_cacher.dart';
+import 'package:flutter_video_test/media_deletion.dart';
 import 'package:flutter_video_test/media_downloader.dart';
 import 'package:flutter_video_test/media_link.dart';
 import 'package:intl/intl.dart';
@@ -14,13 +16,21 @@ import 'package:teno_rrule/teno_rrule.dart';
 
 class ApiCall {
   ApiCall({Dio? dio, MediaDownloader? downloader, MediaCacher? cacher})
-    : _dio = dio ?? Dio(),
-      _downloader = downloader ?? MediaDownloader(),
-      _cacher = cacher ?? MediaCacher();
+    : this._(
+        dio ?? Dio(),
+        downloader ?? MediaDownloader(),
+        cacher ?? MediaCacher(),
+      );
+
+  ApiCall._(this._dio, this._downloader, this._cacher)
+    : _mediaDeletion = MediaDeletion(mediaDownloader: _downloader),
+      _mediaCacheDeletion = MediaCacheDeletion(mediaCacher: _cacher);
 
   final Dio _dio;
   final MediaDownloader _downloader;
   final MediaCacher _cacher;
+  final MediaDeletion _mediaDeletion;
+  final MediaCacheDeletion _mediaCacheDeletion;
 
   String? _currentResponseJson;
   String? _pendingResponseJson;
@@ -36,10 +46,36 @@ class ApiCall {
     try {
       final data = await _getJsonFromUrl();
       final jsonString = await _shortenJsonData(data);
-      return await _buildMediaFromResponse(jsonString, now: DateTime.now());
+      final media = await _buildMediaFromResponse(
+        jsonString,
+        now: DateTime.now(),
+      );
+      await cleanupStoredMedia();
+      return media;
     } catch (e) {
       debugPrint('Error fetching media from API: $e');
       rethrow;
+    }
+  }
+
+  // Cleans up all media available which isn't used anymore.
+  Future<void> cleanupStoredMedia() async {
+    final responseJson = _currentResponseJson;
+    if (responseJson == null) {
+      throw StateError('Media must be loaded before cleaning stored media.');
+    }
+
+    final ids = getApiMediaIdsFromResponse(responseJson);
+    if (kIsWeb) {
+      await _mediaCacheDeletion.deleteMediaNotInApi(
+        imageIds: ids.images,
+        videoIds: ids.videos,
+      );
+    } else {
+      await _mediaDeletion.deleteMediaNotInApi(
+        imageIds: ids.images,
+        videoIds: ids.videos,
+      );
     }
   }
 
@@ -123,6 +159,63 @@ class ApiCall {
     _pendingResponseJson = null;
     _lastActiveScheduleIds = _scheduleIds(groupSchedules, systemSchedules);
     return downloadedMediaLinks;
+  }
+
+  // Get the media Ids gathered from response
+  @visibleForTesting
+  ({Set<String> images, Set<String> videos}) getApiMediaIdsFromResponse(
+    String jsonString,
+  ) {
+    final json = jsonDecode(jsonString) as Map<String, dynamic>;
+    final playlists = json['playlists'] as Map<String, dynamic>;
+    final slidePlaylists = playlists['slides'] as List<dynamic>;
+    final scheduledPlaylistIds = <String>{};
+    final imageIds = <String>{};
+    final videoIds = <String>{};
+
+    for (final scheduleType in ['group_schedules', 'system_schedules']) {
+      final schedules =
+          (json[scheduleType] as Map<String, dynamic>)['slides'] as List<dynamic>;
+      for (final schedule in schedules) {
+        if (schedule is! Map) continue;
+        final playlist = schedule['playlist'];
+        final playlistId = playlist is Map ? playlist['id'] : null;
+        if (playlistId != null) {
+          scheduledPlaylistIds.add(playlistId.toString());
+        }
+      }
+    }
+
+    for (final playlist in slidePlaylists) {
+      if (playlist is! Map) continue;
+      if (!scheduledPlaylistIds.contains(playlist['id']?.toString())) continue;
+      final slides = playlist['slides'];
+      if (slides is! List) continue;
+
+      for (final slide in slides) {
+        if (slide is! Map) continue;
+        final mediaType = slide['media_type'];
+        final targetIds = mediaType == 'image'
+            ? imageIds
+            : mediaType == 'video'
+            ? videoIds
+            : null;
+        if (targetIds == null) continue;
+
+        final media = slide[mediaType];
+        final id = media is Map ? media['id'] : null;
+        if (id is String && id.isNotEmpty) {
+          targetIds.add(id);
+        }
+
+        final referencedId = slide['${mediaType}_id'];
+        if (referencedId is String && referencedId.isNotEmpty) {
+          targetIds.add(referencedId);
+        }
+      }
+    }
+
+    return (images: imageIds, videos: videoIds);
   }
 
   // Get JSON from api
@@ -370,7 +463,7 @@ class ApiCall {
 
   // Download all media gotten from API
   Future<List<MediaLink>> _downloadMedia(List<MediaLink> media) async {
-    if(kIsWeb) {
+    if (kIsWeb) {
       return await _cacher.cacheAllMedia(links: media);
     } else {
       return await _downloader.downloadAllMedia(links: media);
@@ -395,8 +488,8 @@ class ApiCall {
     final decodedJson = jsonDecode(jsonString);
     final formattedJson = const JsonEncoder.withIndent('  ')
         .convert(decodedJson);
-    
-    if(kIsWeb) {
+
+    if (kIsWeb) {
       oldJson = formattedJson;
     } else {
       final directory = await _downloader.downloadDirectory;
@@ -409,7 +502,7 @@ class ApiCall {
 
   // Load saved API response for comparison
   Future<Map<String, dynamic>> _loadOldApiResponse() async {
-    if(kIsWeb) {
+    if (kIsWeb) {
       return jsonDecode(oldJson!);
     } else {
       final directory = await _downloader.downloadDirectory;
