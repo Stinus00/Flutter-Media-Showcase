@@ -120,3 +120,9 @@ const List<MediaLink> mediaLinks = [
   ),
 ];
 
+const textTickers = [
+  'alskdhfkashdf;kashdkflahsdlfkjashflkjahsdljfkhaslkhdjfaakjshdfkahsdflafadsjfkadjlksf',
+  'BebabobabebabobabebabobabebabobaBebabobabebabobabebabobabebaboba',
+  'Test 123 Test 123 123 Test Test 123 Test 123 Test 123 123 Test Test 123',
+  'Velet est',
+];

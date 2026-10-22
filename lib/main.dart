@@ -3,9 +3,9 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:text_scroll/text_scroll.dart';
 import 'package:video_player/video_player.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
-import 'package:web_browser_detect/web_browser_detect.dart';
 
 import 'media_downloader.dart';
 import 'media_link.dart';
@@ -35,8 +35,6 @@ class _VideoAppState extends State<VideoApp> {
   String? _preloadError;
   int _currentLinkIndex = 0;
 
-  Browser? _browser;
-
   MediaLink? get _currentMedia =>
       _mediaLinks.isEmpty ? null : _mediaLinks[_currentLinkIndex];
 
@@ -45,13 +43,6 @@ class _VideoAppState extends State<VideoApp> {
     super.initState();
     unawaited(WakelockPlus.enable());
     unawaited(_prepareMedia());
-  }
-
-  // Check which webbrowser the user is using
-  void _checkForWebBrowser() {
-    if(kIsWeb) {
-      _browser = Browser.detectOrNull();
-    }
   }
 
   // Download the media given and initialize the first media.
@@ -91,9 +82,6 @@ class _VideoAppState extends State<VideoApp> {
       );
       return;
     }
-
-    
-    _checkForWebBrowser();
 
     // Use file path if not on web and
     //  use url if on web.
@@ -169,17 +157,18 @@ class _VideoAppState extends State<VideoApp> {
         body: Stack(
           alignment: Alignment.center,
           children: [
-            Center(child: _buildMedia()),
-            _buildStartButton(),
-            if (kIsWeb)
-              Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text('Browser is ${_browser?.browser ?? 'Not on web'}'),
-                  Text('Version is ${_browser?.version ?? 'Not on web'}'),
-                ],
-              ),
+            // Center(child: _buildMedia()),
+            // _buildStartButton(),
+            // if (kIsWeb)
+            //   Column(
+            //     mainAxisAlignment: MainAxisAlignment.center,
+            //     mainAxisSize: MainAxisSize.min,
+            //     children: [
+            //       Text('Browser is ${_browser?.browser ?? 'Not on web'}'),
+            //       Text('Version is ${_browser?.version ?? 'Not on web'}'),
+            //     ],
+            //   ),
+            _buildTickers(),
           ],
         ),
       ),
@@ -241,6 +230,31 @@ class _VideoAppState extends State<VideoApp> {
             child: VideoPlayer(_controller!),
           )
         : const CircularProgressIndicator();
+  }
+
+  Widget _buildTickers() {
+    final tickers = textTickers;
+    var allTickerThing = '';
+
+    for(String ticker in tickers) {
+      allTickerThing += ticker;
+      allTickerThing += " -|-|- ";
+    }
+
+    return 
+      ConstrainedBox(
+        constraints: const BoxConstraints(),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: <Widget>[
+            TextScroll(allTickerThing,
+              velocity: Velocity(pixelsPerSecond: Offset(200, 0)),
+            ),
+            const SizedBox(height: 20),
+          ],
+        ),
+      );
+        
   }
 
   // Start button widget for web
