@@ -147,6 +147,7 @@ class MediaCacher {
     return url; // Return the video ID for retrieval later
   }
 
+  // Load video from IndexedDB and return a blob URL.
   Future<String> loadVideoBlobUrlFromIndexedDB(String id) async {
     return _getOrCreateBlobUrl('videos:$id', () async {
       final bytes = await getMediaWeb('videos', id);
@@ -287,6 +288,7 @@ class MediaCacher {
     await transaction.completed;
   }
 
+  // Get the mediakeys from the indexedDB
   Future<Set<String>> getMediaKeysWeb(String store) async {
     final db = await database;
     final transaction = db.transaction(store, idbModeReadOnly);

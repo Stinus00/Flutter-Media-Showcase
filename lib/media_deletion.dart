@@ -17,6 +17,7 @@ class MediaDeletion {
     await _deleteFilesNotInApi(Directory('${directory.path}/videos'), videoIds);
   }
 
+  // Delete files that aren't in the API response based on ids
   Future<void> _deleteFilesNotInApi(
     Directory directory,
     Set<String> apiIds,

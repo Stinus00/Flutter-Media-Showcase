@@ -7,7 +7,6 @@ import 'package:flutter_video_test/media_cacher_stub.dart'
     if (dart.library.js_interop) 'package:flutter_video_test/media_cacher.dart';
 import 'package:video_player/video_player.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
-import 'package:web_browser_detect/web_browser_detect.dart';
 
 import 'media_link.dart';
 import 'media_sources.dart';
@@ -30,27 +29,30 @@ class _VideoAppState extends State<VideoApp> {
   // Testing
   bool _initialPlaylistActive = true;
 
+  // Media Paths
   String? _imagePath;
   ImageProvider? _activeImageProvider;
   String? _videoPath;
   VideoPlayerController? _controller;
   Timer? _imageTimer;
+  // Errors
   String? _imageError;
   String? _videoError;
+  String? _preloadError;
+  // Global booleans
   bool _isChangingVideo = false;
   bool _hasStartedPlayback = false;
   bool _isPreparingMedia = true;
   bool _changingPlaylist = false;
-  String? _preloadError;
   int _currentLinkIndex = 0;
+  // Check API timers
   Timer? _scheduleCheckTimer;
   Timer? _payloadCheckTimer;
+  // Check API booleans
   bool _checkSchedule = false;
   bool _checkPayload = false;
   bool _isCheckingForChanges = false;
   bool _payloadCheckQueued = false;
-
-  Browser? _browser;
 
   MediaLink? get _currentMedia =>
       _mediaLinks.isEmpty ? null : _mediaLinks[_currentLinkIndex];
@@ -60,13 +62,6 @@ class _VideoAppState extends State<VideoApp> {
     super.initState();
     unawaited(WakelockPlus.enable());
     unawaited(_prepareMedia(mediaLinks, startChangeChecks: true));
-  }
-
-  // Check which webbrowser the user is using
-  void _checkForWebBrowser() {
-    if (kIsWeb) {
-      _browser = Browser.detectOrNull();
-    }
   }
 
   // Start Next Playlist
@@ -83,14 +78,8 @@ class _VideoAppState extends State<VideoApp> {
     bool startChangeChecks = false,
   }) async {
     try {
-      print('test');
-      // If on web give back just the links,
-      //  otherwise download media.
-      //  otherwise if media is empty download media.
+      // Gather media from API
 
-      // if (kIsWeb) {
-      //   _mediaLinks = await _mediaCacher.cacheAllMedia(links: mediaLinks);
-      // } else
       if (_mediaLinks.isEmpty) {
         _mediaLinks = await _apiCall.getMediaFromApi();
       }
@@ -225,8 +214,6 @@ class _VideoAppState extends State<VideoApp> {
       }
       return;
     }
-
-    _checkForWebBrowser();
 
     // Use file path if not on web and
     //  use url if on web.
@@ -441,10 +428,12 @@ class _VideoAppState extends State<VideoApp> {
     _videoPath = null;
     _isChangingVideo = false;
 
+    // Check if schedule changed and rebuild based on changes
     if(_checkSchedule) {
       await _checkForMediaChanges();
       _checkSchedule = false;
     }
+    // Check if payload (API data) changed and rebuild based on changes
     if(_checkPayload) {
       await _checkForMediaChanges(checkPayload: true);
       _checkPayload = false;
@@ -488,15 +477,6 @@ class _VideoAppState extends State<VideoApp> {
               bottom: 16,
               child: _buildNextPlaylistButton(),
             ),
-            // if (kIsWeb)
-            //   Column(
-            //     mainAxisAlignment: MainAxisAlignment.center,
-            //     mainAxisSize: MainAxisSize.min,
-            //     children: [
-            //       Text('Browser is ${_browser?.browser ?? 'Not on web'}'),
-            //       Text('Version is ${_browser?.version ?? 'Not on web'}'),
-            //     ],
-            //   ),
           ],
         ),
       ),
@@ -522,9 +502,10 @@ class _VideoAppState extends State<VideoApp> {
         ),
       );
     }
+
+    // If there's an video error, skip media and display error message.
     if (_videoError != null) {
       _skipMedia();
-
       return Padding(
         padding: const EdgeInsets.all(24),
         child: Text(
@@ -533,7 +514,10 @@ class _VideoAppState extends State<VideoApp> {
         ),
       );
     }
+
+    // If there's an image error, skip media and display error message.
     if (_imageError != null) {
+      _skipMedia();
       return Padding(
         padding: const EdgeInsets.all(24),
         child: Text(
@@ -543,6 +527,7 @@ class _VideoAppState extends State<VideoApp> {
       );
     }
 
+    // Placeholder if no media available
     if(_mediaLinks.isEmpty) {
       return Image.asset(
         'assets/placeholder-green.png',
@@ -554,6 +539,8 @@ class _VideoAppState extends State<VideoApp> {
 
     final media = _currentMedia!;
 
+    // Return Image on web
+    // Return Image File on web
     if (media.type == 'image') {
       if (kIsWeb) {
         return _imagePath == null
@@ -575,6 +562,7 @@ class _VideoAppState extends State<VideoApp> {
             );
     }
 
+    // Return Video if its not an image
     return _controller?.value.isInitialized ?? false
         ? AspectRatio(
             aspectRatio: _controller!.value.aspectRatio,
@@ -625,7 +613,7 @@ class _VideoAppState extends State<VideoApp> {
     );
   }
 
-  // Button to play next playlist for testing
+  // Button to re-ask API data for testing
   Widget _buildNextPlaylistButton() {
     return AnimatedSwitcher(
       duration: const Duration(milliseconds: 250),

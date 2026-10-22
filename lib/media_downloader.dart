@@ -50,6 +50,7 @@ class MediaDownloader {
     required String name,
     void Function(int received, int total)? onReceiveProgress,
   }) async {
+    // Get image directory
     final directory = await downloadDirectory;
     final imageDirectory = Directory('${directory.path}/images');
     final file = File('${imageDirectory.path}/$name.${_getFileExtension(link)}');
@@ -77,10 +78,12 @@ class MediaDownloader {
     void Function(int received, int total)? onReceiveProgress,
   }) async {
 
+    // Get video directory
     final directory = await downloadDirectory;
     final videoDirectory = Directory('${directory.path}/videos');
     final file = File('${videoDirectory.path}/$name.${_getFileExtension(link)}');
 
+    // File in assets folder
     if (!_checkHttp(link) && _checkAsset(link)){
       final byteData = await rootBundle.load(link);
       await file.writeAsBytes(
@@ -90,6 +93,7 @@ class MediaDownloader {
       return file.path;
     }
 
+    // File online
     try {
       if (!await file.exists()) {
         await videoDirectory.create(recursive: true);
