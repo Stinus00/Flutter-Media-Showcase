@@ -1,5 +1,3 @@
-import 'media_link.dart';
-
 class MediaCacher {
   Future<List<dynamic>> cacheAllMedia({required List<dynamic> links}) =>
       throw UnsupportedError('MediaCacher is only available on web.');
