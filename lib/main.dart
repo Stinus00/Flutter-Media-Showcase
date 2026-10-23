@@ -148,9 +148,10 @@ class _VideoAppState extends State<VideoApp> {
       _isChangingVideo = true;
       _imageTimer?.cancel();
       _imageTimer = null;
-      final controller = _controller;
+      var controller = _controller;
       controller?.removeListener(_handleVideoState);
       await controller?.dispose();
+      controller = null;
       _controller = null;
       _mediaLinks = updatedMediaLinks;
       _currentLinkIndex = 0;
@@ -217,7 +218,7 @@ class _VideoAppState extends State<VideoApp> {
 
     // Use file path if not on web and
     //  use url if on web.
-    VideoPlayerController controller;
+    VideoPlayerController? controller;
     if (!kIsWeb) {
       _videoPath = media.localPath;
       controller = VideoPlayerController.file(File(_videoPath!));
@@ -256,8 +257,9 @@ class _VideoAppState extends State<VideoApp> {
       if (!mounted) return;
       setState(() {
         _videoError =
-            "$error\nid: ${media.link}\ntype: ${media.type}\ncontroller: ${controller.value}";
+            "$error\nid: ${media.link}\ntype: ${media.type}\ncontroller: ${controller?.value}";
       });
+      controller = null;
     }
   }
 
@@ -344,6 +346,7 @@ class _VideoAppState extends State<VideoApp> {
       }
     } catch (error) {
       await nextController?.dispose();
+      nextController = null;
       if (!mounted) return;
       setState(() {
         _videoError = '$error\nid: ${media.link}\ntype: ${media.type}';
@@ -352,13 +355,14 @@ class _VideoAppState extends State<VideoApp> {
       return;
     }
 
-    final readyController = nextController;
+    VideoPlayerController? readyController = nextController;
     if (!mounted) {
       await readyController.dispose();
+      readyController = null;
       return;
     }
 
-    final controller = _controller;
+    var controller = _controller;
     controller?.removeListener(_handleVideoState);
     readyController.addListener(_handleVideoState);
     _controller = readyController;
@@ -371,6 +375,7 @@ class _VideoAppState extends State<VideoApp> {
     setState(() {});
 
     await controller?.dispose();
+    controller = null;
     await _evictActiveImage();
     _handleVideoState();
   }
@@ -413,9 +418,10 @@ class _VideoAppState extends State<VideoApp> {
       imageProvider = null;
     }
 
-    final controller = _controller;
+    var controller = _controller;
     controller?.removeListener(_handleVideoState);
     await controller?.dispose();
+    controller = null;
     await _evictActiveImage();
     if (!mounted) return;
 
@@ -647,9 +653,10 @@ class _VideoAppState extends State<VideoApp> {
     _imageTimer?.cancel();
     _scheduleCheckTimer?.cancel();
     _payloadCheckTimer?.cancel();
-    final controller = _controller;
+    var controller = _controller;
     unawaited(() async {
       await controller?.dispose();
+      controller = null;
       await _evictActiveImage();
     }());
     unawaited(WakelockPlus.disable());
