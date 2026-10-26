@@ -17,15 +17,19 @@ import 'package:intl/intl.dart';
 import 'package:teno_rrule/teno_rrule.dart';
 
 class ApiCall {
-  ApiCall({Dio? dio, MediaDownloader? downloader, MediaCacher? cacher, ApiXmlHandler? apiXmlHandler})
-    : this._(
-        dio ?? Dio(),
-        downloader ?? MediaDownloader(),
-        cacher ?? MediaCacher(),
-        apiXmlHandler ?? ApiXmlHandler();
-      );
+  ApiCall({
+    Dio? dio,
+    MediaDownloader? downloader,
+    MediaCacher? cacher,
+    ApiXmlHandler? apiXmlHandler,
+  }) : this._(
+         dio ?? Dio(),
+         downloader ?? MediaDownloader(),
+         cacher ?? MediaCacher(),
+         apiXmlHandler ?? ApiXmlHandler(),
+       );
 
-  ApiCall._(this._dio, this._downloader, this._cacher)
+  ApiCall._(this._dio, this._downloader, this._cacher, this._apiXmlHandler)
     : _mediaDeletion = MediaDeletion(mediaDownloader: _downloader),
       _mediaCacheDeletion = MediaCacheDeletion(mediaCacher: _cacher);
 
@@ -79,15 +83,17 @@ class ApiCall {
       await _mediaCacheDeletion.deleteMediaNotInApi(
         imageIds: ids.images,
         videoIds: ids.videos,
+        frameIds: ids.frames,
       );
     } else {
       await _mediaDeletion.deleteMediaNotInApi(
         imageIds: ids.images,
         videoIds: ids.videos,
+        frameIds: ids.frames,
       );
     }
   }
-  
+
   Future<List<FrameLink>> getFrameLinksFromApi() async {
     try {
       final responseJson = _currentResponseJson;
@@ -128,7 +134,9 @@ class ApiCall {
   // Check if schedules are different (without calling API)
   bool haveSchedulesChanged({DateTime? now}) {
     final responseJson = _pendingResponseJson ?? _currentResponseJson;
-    if (responseJson == null || _lastActiveScheduleIds == null || _lastActiveScheduleFrameIds == null) {
+    if (responseJson == null ||
+        _lastActiveScheduleIds == null ||
+        _lastActiveScheduleFrameIds == null) {
       throw StateError('Media must be loaded before checking schedules.');
     }
 
@@ -142,7 +150,8 @@ class ApiCall {
       now: now ?? DateTime.now(),
     );
 
-    return !setEquals(activeScheduleIds, _lastActiveScheduleIds) || !setEquals(activeScheduleFrameIds, _lastActiveScheduleFrameIds);
+    return !setEquals(activeScheduleIds, _lastActiveScheduleIds) ||
+        !setEquals(activeScheduleFrameIds, _lastActiveScheduleFrameIds);
   }
 
   // Rebuild media if needed
@@ -182,8 +191,18 @@ class ApiCall {
     _playlistsMapMedia.clear();
     _mapPlaylists(playlists);
 
-    final groupSchedules = _getGroupSchedules(media, mapJson, 'slides', now: now);
-    final systemSchedules = _getSystemSchedules(media, mapJson, 'slides', now: now);
+    final groupSchedules = _getGroupSchedules(
+      media,
+      mapJson,
+      'slides',
+      now: now,
+    );
+    final systemSchedules = _getSystemSchedules(
+      media,
+      mapJson,
+      'slides',
+      now: now,
+    );
 
     _getPlaylistData(media, shuffleList, mainList, 'slides');
     shuffleList.shuffle();
@@ -203,25 +222,41 @@ class ApiCall {
 
   // Get the media Ids gathered from response
   @visibleForTesting
-  ({Set<String> images, Set<String> videos}) getApiMediaIdsFromResponse(
-    String jsonString,
-  ) {
+  ({Set<String> images, Set<String> videos, Set<String> frames})
+  getApiMediaIdsFromResponse(String jsonString) {
     final json = jsonDecode(jsonString) as Map<String, dynamic>;
     final playlists = json['playlists'] as Map<String, dynamic>;
     final slidePlaylists = playlists['slides'] as List<dynamic>;
+    final framePlaylists = playlists['frames'] as List<dynamic>? ?? [];
     final scheduledPlaylistIds = <String>{};
     final imageIds = <String>{};
     final videoIds = <String>{};
+    final scheduledFramePlaylistIds = <String>{};
+    final frameIds = <String>{};
 
     for (final scheduleType in ['group_schedules', 'system_schedules']) {
       final schedules =
-          (json[scheduleType] as Map<String, dynamic>)['slides'] as List<dynamic>;
+          (json[scheduleType] as Map<String, dynamic>)['slides']
+              as List<dynamic>;
       for (final schedule in schedules) {
         if (schedule is! Map) continue;
         final playlist = schedule['playlist'];
         final playlistId = playlist is Map ? playlist['id'] : null;
         if (playlistId != null) {
           scheduledPlaylistIds.add(playlistId.toString());
+        }
+      }
+
+      final frameSchedules =
+          (json[scheduleType] as Map<String, dynamic>)['frames']
+              as List<dynamic>? ??
+          [];
+      for (final schedule in frameSchedules) {
+        if (schedule is! Map) continue;
+        final playlist = schedule['playlist'];
+        final playlistId = playlist is Map ? playlist['id'] : null;
+        if (playlistId != null) {
+          scheduledFramePlaylistIds.add(playlistId.toString());
         }
       }
     }
@@ -255,9 +290,32 @@ class ApiCall {
       }
     }
 
-    return (images: imageIds, videos: videoIds);
+    for (final playlist in framePlaylists) {
+      if (playlist is! Map) continue;
+      if (!scheduledFramePlaylistIds.contains(playlist['id']?.toString())) {
+        continue;
+      }
+      final frames = playlist['frames'];
+      if (frames is! List) continue;
+
+      for (final frame in frames) {
+        if (frame is! Map) continue;
+        final image = frame['image'];
+        final id = image is Map ? image['id'] : null;
+        if (id is String && id.isNotEmpty) {
+          frameIds.add(id);
+        }
+
+        final referencedId = frame['image_id'];
+        if (referencedId is String && referencedId.isNotEmpty) {
+          frameIds.add(referencedId);
+        }
+      }
+    }
+
+    return (images: imageIds, videos: videoIds, frames: frameIds);
   }
-  
+
   // Build frames list from response
   Future<List<FrameLink>> _buildFramesFromResponse(
     String jsonString, {
@@ -270,8 +328,18 @@ class ApiCall {
     _playlistsMapFrames.clear();
     _mapFramePlaylists(playlists);
 
-    final groupSchedules = _getGroupSchedules(frames, mapJson, 'frames', now: now);
-    final systemSchedules = _getSystemSchedules(frames, mapJson, 'frames', now: now);
+    final groupSchedules = _getGroupSchedules(
+      frames,
+      mapJson,
+      'frames',
+      now: now,
+    );
+    final systemSchedules = _getSystemSchedules(
+      frames,
+      mapJson,
+      'frames',
+      now: now,
+    );
 
     _getPlaylistData(frames, List.empty(), mainList, 'frames');
 
@@ -308,11 +376,15 @@ class ApiCall {
   // Get the group schedules and return list.
   List<dynamic> _getGroupSchedules(
     List<dynamic> media,
-    Map<String, dynamic> data, 
+    Map<String, dynamic> data,
     String type, {
     DateTime? now,
   }) {
-    List<dynamic> groupSchedules = _getActiveGroupSchedules(data, type, now: now);
+    List<dynamic> groupSchedules = _getActiveGroupSchedules(
+      data,
+      type,
+      now: now,
+    );
     media.addAll(groupSchedules);
     return groupSchedules;
   }
@@ -327,7 +399,7 @@ class ApiCall {
   }
 
   List<dynamic> _getActiveGroupSchedules(
-    Map<String, dynamic> data, 
+    Map<String, dynamic> data,
     String type, {
     DateTime? now,
   }) {
@@ -342,11 +414,15 @@ class ApiCall {
   // Get the system schedules and return list
   List<dynamic> _getSystemSchedules(
     List<dynamic> media,
-    Map<String, dynamic> data, 
+    Map<String, dynamic> data,
     String type, {
     DateTime? now,
   }) {
-    List<dynamic> systemSchedules = _getActiveSystemSchedules(data, type, now: now);
+    List<dynamic> systemSchedules = _getActiveSystemSchedules(
+      data,
+      type,
+      now: now,
+    );
     media.addAll(systemSchedules);
     return systemSchedules;
   }
@@ -361,7 +437,7 @@ class ApiCall {
   }
 
   List<dynamic> _getActiveSystemSchedules(
-    Map<String, dynamic> data, 
+    Map<String, dynamic> data,
     String type, {
     DateTime? now,
   }) {
@@ -555,7 +631,9 @@ class ApiCall {
   }
 
   // Convert frames gotten from API to FrameLinks
-  Future<List<FrameLink>> _convertFramesToFrameLinks(List<dynamic> frames) async {
+  Future<List<FrameLink>> _convertFramesToFrameLinks(
+    List<dynamic> frames,
+  ) async {
     // Get mimetype from given mimetype or from link extension
     String getMimeType(String type, item) {
       switch (_getFileExtension(item['image']['url'])) {
@@ -576,7 +654,7 @@ class ApiCall {
     List<FrameLink> frameLinks = [];
     for (var item in frames) {
       final type = 'frame';
-      final duration = item['interval_minutes'] * 60 * 1000 ;
+      final duration = item['interval_minutes'] * 60 * 1000;
       final url = item['image']['url'];
       final id = item['image']['id'];
       final mimeType = getMimeType(type, item);
@@ -586,23 +664,21 @@ class ApiCall {
       int x2 = 0;
       int y2 = 0;
 
-      if(_apiXmlHandler.checkPropertyExists(item))
-      {
+      if (_apiXmlHandler.checkPropertyExists(item)) {
         x1 = item['properties']['cutout']['x1'];
         y1 = item['properties']['cutout']['y1'];
         x2 = item['properties']['cutout']['x2'];
         y2 = item['properties']['cutout']['y2'];
-      } else if(_apiXmlHandler.checkCoordsInLink(url)) {
+      } else if (_apiXmlHandler.checkCoordsInLink(url)) {
         (x1, y1, x2, y2) = _apiXmlHandler.extractAllQueryParams(url);
-      } 
-      else {
+      } else {
         String? xmlUrl = await _apiXmlHandler.convertLinkToXMLString(url);
-        if(xmlUrl == null || xmlUrl.isEmpty) {
+        if (xmlUrl == null || xmlUrl.isEmpty) {
           continue;
         }
         (x1, y1, x2, y2) = await _apiXmlHandler.getCoordinates(xmlUrl);
       }
-      
+
       frameLinks.add(
         FrameLink(
           link: url,
@@ -611,10 +687,10 @@ class ApiCall {
           id: id,
           mimeType: mimeType,
           creationType: creationType,
-          x1:x1.toDouble(),
-          y1:y1.toDouble(),
-          x2:x2.toDouble(),
-          y2:y2.toDouble(),
+          x1: x1.toDouble(),
+          y1: y1.toDouble(),
+          x2: x2.toDouble(),
+          y2: y2.toDouble(),
         ),
       );
     }
@@ -629,10 +705,9 @@ class ApiCall {
 
   // Download all media gotten from API
   Future<List<MediaLink>> _downloadMedia(List<MediaLink> media) async {
-    if(kIsWeb) {
-      return List<MediaLink>.from(
-        await _cacher.cacheAllMedia(links: media),
-      );
+    if (kIsWeb) {
+      print(media);
+      return List<MediaLink>.from(await _cacher.cacheAllMedia(links: media));
     } else {
       return List<MediaLink>.from(
         await _downloader.downloadAllMedia(links: media),
@@ -641,10 +716,8 @@ class ApiCall {
   }
 
   Future<List<FrameLink>> _downloadFrames(List<FrameLink> frames) async {
-    if(kIsWeb) {
-      return List<FrameLink>.from(
-        await _cacher.cacheAllMedia(links: frames),
-      );
+    if (kIsWeb) {
+      return List<FrameLink>.from(await _cacher.cacheAllMedia(links: frames));
     } else {
       return List<FrameLink>.from(
         await _downloader.downloadAllMedia(links: frames),

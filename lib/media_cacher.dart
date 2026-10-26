@@ -224,17 +224,17 @@ class MediaCacher {
     return url; // Return the video ID for retrieval later
   }
 
-  // Load video from IndexedDB and return a blob URL.
-  Future<String> loadVideoBlobUrlFromIndexedDB(String id) async {
-    return _getOrCreateBlobUrl('videos:$id', () async {
-      final bytes = await getMediaWeb('videos', id);
-      if (bytes == null || bytes.isEmpty) {
-        throw StateError(
-          'Video bytes are missing or empty in IndexedDB for "$id".',
-        );
-      }
-    }
-  }
+  // // Load video from IndexedDB and return a blob URL.
+  // Future<String> loadVideoBlobUrlFromIndexedDB(String id) async {
+  //   return _getOrCreateBlobUrl('videos:$id', () async {
+  //     final bytes = await getMediaWeb('videos', id);
+  //     if (bytes == null || bytes.isEmpty) {
+  //       throw StateError(
+  //         'Video bytes are missing or empty in IndexedDB for "$id".',
+  //       );
+  //     }
+  //   }
+  // }
                                
   // Put image into IndexedDB
   Future<String> _cacheWebImage(
@@ -260,20 +260,12 @@ class MediaCacher {
     );
 
     if (response.statusCode != 200 || response.data == null) {
-      throw Exception('[media_downloader.dart] Failed to download frame');
+      throw Exception('[media_downloader.dart] Failed to download image');
     }
 
     final bytes = Uint8List.fromList(response.data!);
 
-  // Get or create a blob URL for the given key.
-  // // If the blob URL is already cached, return it.
-  // // Otherwise, create a new blob URL using the provided `create` function and cache it.
-  Future<String> _getOrCreateBlobUrl(
-    String key,
-    Future<String> Function() create,
-  ) async {
-    final cached = _blobUrlCache[key];
-    if (cached != null) return cached;
+    final db = await database;
 
     final txn = db.transaction('images', idbModeReadWrite);
     final store = txn.objectStore('images');
@@ -284,6 +276,26 @@ class MediaCacher {
 
     return url; // Return the image url for retrieval later
   }
+
+  // // Get or create a blob URL for the given key.
+  // // // If the blob URL is already cached, return it.
+  // // // Otherwise, create a new blob URL using the provided `create` function and cache it.
+  // Future<String> _getOrCreateBlobUrl(
+  //   String key,
+  //   Future<String> Function() create,
+  // ) async {
+  //   final cached = _blobUrlCache[key];
+  //   if (cached != null) return cached;
+
+  //   final txn = db.transaction('images', idbModeReadWrite);
+  //   final store = txn.objectStore('images');
+
+  //   await store.put({'bytes': bytes}, imageId);
+
+  //   await txn.completed;
+
+  //   return url; // Return the image url for retrieval later
+  // }
 
   // Put image into IndexedDB
   Future<String> _cacheWebFrame(
@@ -309,7 +321,7 @@ class MediaCacher {
     );
 
     if (response.statusCode != 200 || response.data == null) {
-      throw Exception('[media_downloader.dart] Failed to download image');
+      throw Exception('[media_downloader.dart] Failed to download frame');
     }
 
     final bytes = Uint8List.fromList(response.data!);

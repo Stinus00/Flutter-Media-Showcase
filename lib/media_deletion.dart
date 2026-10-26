@@ -11,10 +11,12 @@ class MediaDeletion {
   Future<void> deleteMediaNotInApi({
     required Set<String> imageIds,
     required Set<String> videoIds,
+    required Set<String> frameIds,
   }) async {
     final directory = await _mediaDownloader.downloadDirectory;
     await _deleteFilesNotInApi(Directory('${directory.path}/images'), imageIds);
     await _deleteFilesNotInApi(Directory('${directory.path}/videos'), videoIds);
+    await _deleteFilesNotInApi(Directory('${directory.path}/frames'), frameIds);
   }
 
   // Delete files that aren't in the API response based on ids
