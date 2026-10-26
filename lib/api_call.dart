@@ -443,7 +443,7 @@ class ApiCall {
     List<MediaLink> mediaLinks = [];
     for (var item in media) {
       final type = item['media_type'];
-      final duration = item['ad_duration'] * 1000;
+      final duration = type == 'image' ? item['ad_duration'] * 1000 : null;
       final url = type == 'image' ? item['image']['url'] : item['video']['url'];
       final id = type == 'image' ? item['image']['id'] : item['video']['id'];
       final mimeType = getMimeType(type, item);
