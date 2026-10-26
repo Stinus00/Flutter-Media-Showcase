@@ -706,7 +706,6 @@ class ApiCall {
   // Download all media gotten from API
   Future<List<MediaLink>> _downloadMedia(List<MediaLink> media) async {
     if (kIsWeb) {
-      print(media);
       return List<MediaLink>.from(await _cacher.cacheAllMedia(links: media));
     } else {
       return List<MediaLink>.from(

@@ -40,20 +40,21 @@ class _VideoAppState extends State<VideoApp> {
   String? _framePath;
   String? _videoPath;
   VideoPlayerController? _controller;
-  
+
   // Timers
   Timer? _imageTimer;
   Timer? _frameTimer;
   Timer? _reloadTimer;
   ImageProvider? _activeImageProvider;
-  
+
   // Errors
   String? _imageError;
   String? _videoError;
   String? _preloadError;
-  
+
   // Global booleans
   bool _isChangingVideo = false;
+  bool _isSkippingMedia = false;
   bool _isPreparingMedia = true;
   bool _changingPlaylist = false;
   int _currentLinkIndex = 0;
@@ -101,13 +102,6 @@ class _VideoAppState extends State<VideoApp> {
   // Download the media given and initialize the first media.
   Future<void> _prepareMedia({bool startChangeChecks = false}) async {
     try {
-      // If on web give back just the links,
-      //  otherwise download media.
-      //  otherwise if media is empty download media.
-
-      // if (kIsWeb) {
-      //   _mediaLinks = await _mediaCacher.cacheAllMedia(links: mediaLinks);
-      // } else
       if (_mediaLinks.isEmpty) {
         _mediaLinks = await _apiCall.getMediaFromApi();
       }
@@ -141,13 +135,13 @@ class _VideoAppState extends State<VideoApp> {
     _scheduleCheckTimer ??= Timer.periodic(const Duration(minutes: 1), (_) {
       _checkSchedule = true;
       if (_mediaLinks.isEmpty) {
-        unawaited(_prepareMedia());
+        unawaited(_checkForMediaChanges());
       }
     });
     _payloadCheckTimer ??= Timer.periodic(const Duration(minutes: 15), (_) {
       _checkPayload = true;
       if (_mediaLinks.isEmpty) {
-        unawaited(_prepareMedia());
+        unawaited(_checkForMediaChanges());
       }
     });
   }
@@ -160,7 +154,6 @@ class _VideoAppState extends State<VideoApp> {
       _payloadCheckQueued = _payloadCheckQueued || checkPayload;
       return;
     }
-
     _isCheckingForChanges = true;
     try {
       final payloadChanged = checkPayload
@@ -195,12 +188,11 @@ class _VideoAppState extends State<VideoApp> {
       _mediaLinks = updatedMediaLinks;
       _frameLinks = updatedFrameLinks;
 
-      _initializeMedia();
-      _initializeFrame();
+      await _initializeMedia();
+      await _initializeFrame();
 
       if (!mounted) return;
       setState(() {});
-      await _initializeMedia();
       try {
         await _apiCall.cleanupStoredMedia();
       } catch (error) {
@@ -354,12 +346,74 @@ class _VideoAppState extends State<VideoApp> {
     );
   }
 
-  // Skip current media because of error
-  // // Remove media from list
   void _skipMedia() {
-    _mediaLinks.removeAt(_currentLinkIndex);
-    _currentLinkIndex -= 1;
-    _playNextMedia();
+    if (_isSkippingMedia || (_videoError == null && _imageError == null)) {
+      return;
+    }
+
+    _isSkippingMedia = true;
+    scheduleMicrotask(() => unawaited(_skipFailedMedia()));
+  }
+
+  Future<void> _skipFailedMedia() async {
+    try {
+      if (mounted && _mediaLinks.isEmpty) {
+        _imageTimer?.cancel();
+        _imageTimer = null;
+        final controller = _controller;
+        controller?.removeListener(_handleVideoState);
+        _controller = null;
+        await controller?.dispose();
+        await _evictActiveImage();
+        if (!mounted) return;
+        _currentLinkIndex = 0;
+        _imageError = null;
+        _videoError = null;
+        _imagePath = null;
+        _videoPath = null;
+        _isChangingVideo = false;
+        setState(() {});
+        return;
+      }
+
+      while (mounted &&
+          _mediaLinks.isNotEmpty &&
+          (_videoError != null || _imageError != null)) {
+        final failedIndex =
+            _currentLinkIndex < 0 || _currentLinkIndex >= _mediaLinks.length
+            ? 0
+            : _currentLinkIndex;
+        final failedMedia = _mediaLinks.removeAt(failedIndex);
+        debugPrint('Skipping media ${failedMedia.link} after load error');
+
+        _imageTimer?.cancel();
+        _imageTimer = null;
+        final controller = _controller;
+        controller?.removeListener(_handleVideoState);
+        _controller = null;
+        await controller?.dispose();
+        await _evictActiveImage();
+        if (!mounted) return;
+
+        _imageError = null;
+        _videoError = null;
+        _imagePath = null;
+        _videoPath = null;
+
+        if (_mediaLinks.isEmpty) {
+          _currentLinkIndex = 0;
+          _isChangingVideo = false;
+          setState(() {});
+          return;
+        }
+
+        _currentLinkIndex =
+            (failedIndex - 1 + _mediaLinks.length) % _mediaLinks.length;
+        await _playNextMedia();
+      }
+    } finally {
+      _isSkippingMedia = false;
+    }
   }
 
   // Skip current media because of error
@@ -476,6 +530,7 @@ class _VideoAppState extends State<VideoApp> {
     await controller?.dispose();
     controller = null;
     await _evictActiveImage();
+    await _checkPendingMediaChanges();
     _handleVideoState();
   }
 
@@ -533,21 +588,12 @@ class _VideoAppState extends State<VideoApp> {
     _videoPath = null;
     _isChangingVideo = false;
 
-    // Check if schedule changed and rebuild based on changes
-    if(_checkSchedule) {
-      await _checkForMediaChanges();
-      _checkSchedule = false;
-    }
-    // Check if payload (API data) changed and rebuild based on changes
-    if(_checkPayload) {
-      await _checkForMediaChanges(checkPayload: true);
-      _checkPayload = false;
-    }
+    await _checkPendingMediaChanges();
     if (_changingPlaylist) {
       unawaited(_startNextPlaylist());
       return;
     }
-    await _initializeMedia();
+    if (!identical(_currentMedia, media)) return;
     setState(() {});
 
     if (imageError == null) {
@@ -555,8 +601,18 @@ class _VideoAppState extends State<VideoApp> {
     }
   }
 
+  Future<void> _checkPendingMediaChanges() async {
+    if (_checkSchedule) {
+      _checkSchedule = false;
+      await _checkForMediaChanges();
+    }
+    if (_checkPayload) {
+      _checkPayload = false;
+      await _checkForMediaChanges(checkPayload: true);
+    }
+  }
+
   Future<void> _playNextFrame() async {
-    print('Changing Frames at:' + DateTime.now().toString());
     if (_frameLinks.isEmpty) return;
 
     _frameTimer?.cancel();
@@ -651,7 +707,7 @@ class _VideoAppState extends State<VideoApp> {
       );
     }
 
-    // If there's an video error, skip media and display error message.
+    // If there's a video error, skip media and display the error temporarily.
     if (_videoError != null) {
       _skipMedia();
       return Padding(
@@ -663,7 +719,7 @@ class _VideoAppState extends State<VideoApp> {
       );
     }
 
-    // If there's an image error, skip media and display error message.
+    // If there's an image error, skip media and display the error temporarily.
     if (_imageError != null) {
       _skipMedia();
       return Padding(
@@ -676,7 +732,7 @@ class _VideoAppState extends State<VideoApp> {
     }
 
     // Placeholder if no media available
-    if(_mediaLinks.isEmpty) {
+    if (_mediaLinks.isEmpty) {
       return Image.asset(
         'assets/placeholder-green.png',
         fit: BoxFit.contain,
@@ -698,6 +754,10 @@ class _VideoAppState extends State<VideoApp> {
                 fit: BoxFit.contain,
                 height: double.infinity,
                 width: double.infinity,
+                errorBuilder: (context, error, stackTrace) {
+                  _handleMediaImageError(media, error);
+                  return const SizedBox.shrink();
+                },
               );
       }
       return _imagePath == null
@@ -707,6 +767,10 @@ class _VideoAppState extends State<VideoApp> {
               fit: BoxFit.contain,
               height: double.infinity,
               width: double.infinity,
+              errorBuilder: (context, error, stackTrace) {
+                _handleMediaImageError(media, error);
+                return const SizedBox.shrink();
+              },
             );
     }
 
@@ -717,6 +781,18 @@ class _VideoAppState extends State<VideoApp> {
             child: VideoPlayer(_controller!),
           )
         : const CircularProgressIndicator();
+  }
+
+  void _handleMediaImageError(MediaLink media, Object error) {
+    if (!identical(_currentMedia, media) || _imageError != null) return;
+    scheduleMicrotask(() {
+      if (!mounted || !identical(_currentMedia, media) || _imageError != null) {
+        return;
+      }
+      setState(() {
+        _imageError = error.toString();
+      });
+    });
   }
 
   Widget _buildMediaFrame() {
@@ -785,12 +861,18 @@ class _VideoAppState extends State<VideoApp> {
         foregroundColor: Colors.white,
         elevation: 0,
         onPressed: () {
-          setState(() {
-            _checkPayload = true;
-            if (_mediaLinks.isEmpty) {
-              _prepareMedia();
-            }
-          });
+          if (_isPreparingMedia) return;
+
+          if (_mediaLinks.isEmpty) {
+            setState(() {
+              _preloadError = null;
+            });
+            unawaited(_checkForMediaChanges(checkPayload: true));
+          } else {
+            setState(() {
+              _checkPayload = true;
+            });
+          }
         },
         icon: const Icon(Icons.play_arrow),
         label: const Text('Refresh A'),
