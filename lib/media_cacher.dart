@@ -13,8 +13,7 @@ import 'package:dio/dio.dart';
 import 'package:idb_shim/idb_browser.dart';
 
 class MediaCacher {
-  MediaCacher({Dio? dio}) : _dio = dio ?? Dio();
-  final Dio _dio;
+  MediaCacher({Dio? dio});
   final _factory = getIdbFactory();
 
   // Cache for blob URLs to avoid creating multiple blob URLs for the same media.
