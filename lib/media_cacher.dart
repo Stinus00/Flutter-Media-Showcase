@@ -224,6 +224,18 @@ class MediaCacher {
     return url; // Return the video ID for retrieval later
   }
 
+  // Load video from IndexedDB and return a blob URL.
+  Future<String> loadVideoBlobUrlFromIndexedDB(String id) async {
+    return _getOrCreateBlobUrl('videos:$id', () async {
+      final bytes = await getMediaWeb('videos', id);
+      if (bytes == null || bytes.isEmpty) {
+        throw StateError(
+          'Video bytes are missing or empty in IndexedDB for "$id".',
+        );
+      }
+    }
+  }
+                               
   // Put image into IndexedDB
   Future<String> _cacheWebImage(
     String imageId,
@@ -253,7 +265,15 @@ class MediaCacher {
 
     final bytes = Uint8List.fromList(response.data!);
 
-    final db = await database;
+  // Get or create a blob URL for the given key.
+  // // If the blob URL is already cached, return it.
+  // // Otherwise, create a new blob URL using the provided `create` function and cache it.
+  Future<String> _getOrCreateBlobUrl(
+    String key,
+    Future<String> Function() create,
+  ) async {
+    final cached = _blobUrlCache[key];
+    if (cached != null) return cached;
 
     final txn = db.transaction('images', idbModeReadWrite);
     final store = txn.objectStore('images');
@@ -354,5 +374,18 @@ class MediaCacher {
     await transaction.objectStore(store).delete(id);
 
     await transaction.completed;
+  }
+
+  // Get the mediakeys from the indexedDB
+  Future<Set<String>> getMediaKeysWeb(String store) async {
+    final db = await database;
+    final transaction = db.transaction(store, idbModeReadOnly);
+    final keys = await transaction.objectStore(store).getAllKeys();
+    await transaction.completed;
+    return keys.whereType<String>().toSet();
+  }
+
+  void forgetBlobUrlWeb(String store, String id) {
+    _blobUrlCache.remove('$store:$id');
   }
 }

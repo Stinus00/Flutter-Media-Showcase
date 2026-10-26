@@ -35,25 +35,34 @@ class _VideoAppState extends State<VideoApp> {
   // Testing
   bool _initialPlaylistActive = true;
 
+  // Media Paths
   String? _imagePath;
   String? _framePath;
   String? _videoPath;
   VideoPlayerController? _controller;
+  
+  // Timers
   Timer? _imageTimer;
   Timer? _frameTimer;
   Timer? _reloadTimer;
   ImageProvider? _activeImageProvider;
+  
+  // Errors
   String? _imageError;
   String? _videoError;
+  String? _preloadError;
+  
+  // Global booleans
   bool _isChangingVideo = false;
   bool _isPreparingMedia = true;
   bool _changingPlaylist = false;
-  String? _preloadError;
   int _currentLinkIndex = 0;
   int _currentLinkIndexFrame = 0;
   FrameLink? _frameErrorPending;
+  // Check API timers
   Timer? _scheduleCheckTimer;
   Timer? _payloadCheckTimer;
+  // Check API booleans
   bool _checkSchedule = false;
   bool _checkPayload = false;
   bool _isCheckingForChanges = false;
@@ -158,7 +167,10 @@ class _VideoAppState extends State<VideoApp> {
           ? await _apiCall.hasPayloadChanged()
           : false;
       final schedulesChanged = _apiCall.haveSchedulesChanged();
-      if (!payloadChanged && !schedulesChanged) return;
+      if (!payloadChanged && !schedulesChanged) {
+        await _apiCall.cleanupStoredMedia();
+        return;
+      }
 
       final updatedMediaLinks = await _apiCall
           .rebuildMediaForCurrentSchedules();
@@ -167,9 +179,10 @@ class _VideoAppState extends State<VideoApp> {
       _isChangingVideo = true;
       _imageTimer?.cancel();
       _imageTimer = null;
-      final controller = _controller;
+      var controller = _controller;
       controller?.removeListener(_handleVideoState);
       await controller?.dispose();
+      controller = null;
       _controller = null;
       _videoError = null;
       _imagePath = null;
@@ -187,6 +200,12 @@ class _VideoAppState extends State<VideoApp> {
 
       if (!mounted) return;
       setState(() {});
+      await _initializeMedia();
+      try {
+        await _apiCall.cleanupStoredMedia();
+      } catch (error) {
+        debugPrint('Error deleting stale media: $error');
+      }
     } catch (error) {
       debugPrint('Error checking for media changes: $error');
     } finally {
@@ -235,7 +254,7 @@ class _VideoAppState extends State<VideoApp> {
 
     // Use file path if not on web and
     //  use url if on web.
-    VideoPlayerController controller;
+    VideoPlayerController? controller;
     if (!kIsWeb) {
       _videoPath = media.localPath;
       controller = VideoPlayerController.file(File(_videoPath!));
@@ -272,8 +291,9 @@ class _VideoAppState extends State<VideoApp> {
       if (!mounted) return;
       setState(() {
         _videoError =
-            "$error\nid: ${media.link}\ntype: ${media.type}\ncontroller: ${controller.value}";
+            "$error\nid: ${media.link}\ntype: ${media.type}\ncontroller: ${controller?.value}";
       });
+      controller = null;
     }
   }
 
@@ -425,6 +445,7 @@ class _VideoAppState extends State<VideoApp> {
       await controllerToInitialize.play();
     } catch (error) {
       await nextController?.dispose();
+      nextController = null;
       if (!mounted) return;
       setState(() {
         _videoError = '$error\nid: ${media.link}\ntype: ${media.type}';
@@ -433,13 +454,14 @@ class _VideoAppState extends State<VideoApp> {
       return;
     }
 
-    final readyController = nextController;
+    VideoPlayerController? readyController = nextController;
     if (!mounted) {
       await readyController.dispose();
+      readyController = null;
       return;
     }
 
-    final controller = _controller;
+    var controller = _controller;
     controller?.removeListener(_handleVideoState);
     readyController.addListener(_handleVideoState);
     _controller = readyController;
@@ -452,6 +474,7 @@ class _VideoAppState extends State<VideoApp> {
     setState(() {});
 
     await controller?.dispose();
+    controller = null;
     await _evictActiveImage();
     _handleVideoState();
   }
@@ -494,9 +517,10 @@ class _VideoAppState extends State<VideoApp> {
       imageProvider = null;
     }
 
-    final controller = _controller;
+    var controller = _controller;
     controller?.removeListener(_handleVideoState);
     await controller?.dispose();
+    controller = null;
     await _evictActiveImage();
     if (!mounted) return;
 
@@ -509,11 +533,13 @@ class _VideoAppState extends State<VideoApp> {
     _videoPath = null;
     _isChangingVideo = false;
 
-    if (_checkSchedule) {
+    // Check if schedule changed and rebuild based on changes
+    if(_checkSchedule) {
       await _checkForMediaChanges();
       _checkSchedule = false;
     }
-    if (_checkPayload) {
+    // Check if payload (API data) changed and rebuild based on changes
+    if(_checkPayload) {
       await _checkForMediaChanges(checkPayload: true);
       _checkPayload = false;
     }
@@ -624,9 +650,10 @@ class _VideoAppState extends State<VideoApp> {
         ),
       );
     }
+
+    // If there's an video error, skip media and display error message.
     if (_videoError != null) {
       _skipMedia();
-
       return Padding(
         padding: const EdgeInsets.all(24),
         child: Text(
@@ -635,7 +662,10 @@ class _VideoAppState extends State<VideoApp> {
         ),
       );
     }
+
+    // If there's an image error, skip media and display error message.
     if (_imageError != null) {
+      _skipMedia();
       return Padding(
         padding: const EdgeInsets.all(24),
         child: Text(
@@ -645,7 +675,8 @@ class _VideoAppState extends State<VideoApp> {
       );
     }
 
-    if (_mediaLinks.isEmpty) {
+    // Placeholder if no media available
+    if(_mediaLinks.isEmpty) {
       return Image.asset(
         'assets/placeholder-green.png',
         fit: BoxFit.contain,
@@ -656,6 +687,8 @@ class _VideoAppState extends State<VideoApp> {
 
     final media = _currentMedia!;
 
+    // Return Image on web
+    // Return Image File on web
     if (media.type == 'image') {
       if (kIsWeb) {
         return _imagePath == null
@@ -677,6 +710,7 @@ class _VideoAppState extends State<VideoApp> {
             );
     }
 
+    // Return Video if its not an image
     return _controller?.value.isInitialized ?? false
         ? AspectRatio(
             aspectRatio: _controller!.value.aspectRatio,
@@ -736,7 +770,7 @@ class _VideoAppState extends State<VideoApp> {
           );
   }
 
-  // Button to play next playlist for testing
+  // Button to re-ask API data for testing
   Widget _buildNextPlaylistButton() {
     return AnimatedSwitcher(
       duration: const Duration(milliseconds: 250),
@@ -773,9 +807,10 @@ class _VideoAppState extends State<VideoApp> {
     _controller?.dispose();
     _scheduleCheckTimer?.cancel();
     _payloadCheckTimer?.cancel();
-    final controller = _controller;
+    var controller = _controller;
     unawaited(() async {
       await controller?.dispose();
+      controller = null;
       await _evictActiveImage();
     }());
     unawaited(WakelockPlus.disable());
