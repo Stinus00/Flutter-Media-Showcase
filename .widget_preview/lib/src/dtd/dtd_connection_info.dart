@@ -6,4 +6,4 @@ const String kWidgetPreviewService =
 const String kWidgetPreviewScaffoldStream =
     'WidgetPreviewScaffold-dee78f88-92c0-44b2-b5f2-10117161c60d';
 const String kProjectRootPath =
-    r'/Users/stijnvossen/Documents/Flutter/flutter_video_test';
+    r'/Users/stijnvossen/Documents/School/Semester 5 Internship BCM/Prototypes/flutter_video_test';
