@@ -5,12 +5,15 @@ import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_video_test/frame_link.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:flutter_video_test/media_cacher_stub.dart'
     if (dart.library.js_interop) 'package:flutter_video_test/media_cacher.dart';
 import 'package:flutter_video_test/media_downloader.dart';
+import 'package:text_scroll/text_scroll.dart';
 import 'package:video_player/video_player.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
+import 'ticker_sources.dart';
 import 'media_link.dart';
 import 'api_call.dart';
 import 'page_reloader_stub.dart'
@@ -121,6 +124,18 @@ class _VideoAppState extends State<VideoApp> {
       }
     } catch (error) {
       if (!mounted) return;
+      final cachedMedia = await _mediaDownloader.loadDownloadedMedia();
+      final cachedFrames = await _mediaDownloader.loadDownloadedFrames();
+      if (cachedMedia.isNotEmpty) {
+        _mediaLinks = cachedMedia;
+        _frameLinks = cachedFrames;
+        _isPreparingMedia = false;
+        _preloadError = null;
+        if (mounted) setState(() {});
+        await _initializeMedia();
+        await _initializeFrame();
+        return;
+      }
       setState(() {
         _isPreparingMedia = false;
         _preloadError = error.toString();
@@ -665,7 +680,7 @@ class _VideoAppState extends State<VideoApp> {
                             top: y1! * scale,
                             width: (x2! - x1!) * scale,
                             height: (y2! - y1!) * scale,
-                            child: ClipRect(child: _buildMedia()),
+                            child: ClipRect(child: _buildMedia((y2! - y1!) * scale)),
                           ),
                           if (creationType == 'bcm') _buildMediaFrame(),
                         ],
@@ -673,7 +688,7 @@ class _VideoAppState extends State<VideoApp> {
                     ),
                   )
                 else
-                  Center(child: _buildMedia()),
+                  Center(child: _buildMedia(canvasHeight * scale)),
                 Positioned(
                   right: 16,
                   bottom: 16,
@@ -692,31 +707,62 @@ class _VideoAppState extends State<VideoApp> {
   // //  and Image.file on app
   // // Video loading using Videoplayer and controller
   // // Loading screen while media gets downloaded
-  Widget _buildMedia() {
+  Widget _buildMedia(double mediaHeight) {
+    return Stack(
+      alignment: Alignment.bottomCenter,
+      children: [
+        _buildMediaContent(),
+        // Positioned(
+        //   left: 0,
+        //   right: 0,
+        //   bottom: 0,
+        //   child: _buildTickers(mediaHeight, false),
+        // ),
+        // Positioned(
+        //   left: 0,
+        //   right: 0,
+        //   top: 0,
+        //   child: _buildTickers(mediaHeight, true),
+        // ),
+      ],
+    );
+  }
+
+  Widget _buildMediaContent() {
     if (_isPreparingMedia) {
       return const CircularProgressIndicator();
     }
     // Show any error if there is one
     if (_preloadError != null) {
-      return Padding(
-        padding: const EdgeInsets.all(24),
-        child: Text(
-          'Could not download media:\n$_preloadError',
-          textAlign: TextAlign.center,
-        ),
+      final media = _currentMedia;
+      final localPath = media?.localPath;
+      if (!kIsWeb && media != null && localPath != null && File(localPath).existsSync()) {
+        return Image.file(
+          File(localPath),
+          fit: BoxFit.contain,
+          height: double.infinity,
+          width: double.infinity,
+        );
+      }
+      return Image.asset(
+        'assets/placeholder-green.png',
+        fit: BoxFit.contain,
+        height: double.infinity,
+        width: double.infinity,
       );
     }
 
     // If there's a video error, skip media and display the error temporarily.
     if (_videoError != null) {
       _skipMedia();
-      return Padding(
-        padding: const EdgeInsets.all(24),
-        child: Text(
-          'Could not load video:\n$_videoError\n$_videoPath',
-          textAlign: TextAlign.center,
-        ),
-      );
+      return
+        Padding(
+          padding: const EdgeInsets.all(24),
+          child: Text(
+            'Could not load video:\n$_videoError\n$_videoPath',
+            textAlign: TextAlign.center,
+          ),
+        );
     }
 
     // If there's an image error, skip media and display the error temporarily.
@@ -844,6 +890,48 @@ class _VideoAppState extends State<VideoApp> {
               return const SizedBox.shrink();
             },
           );
+  }
+
+  Widget _buildTickers(double mediaHeight, bool backwards) {
+    String allTickers = '';
+    for (String ticker in tickers) {
+      allTickers += ticker;
+      allTickers += ' • ';
+    }
+
+    final percent = 0.1;
+    final fontSize = mediaHeight * percent;
+    const textColor = Colors.white;
+    const borderColor = Colors.black;
+    final borderWidth = fontSize * 0.1;
+    final tickerSpeed = fontSize;
+    final textDirection = backwards ? TextDirection.rtl : TextDirection.ltr;
+
+    return Stack(
+      children: <Widget>[
+        TextScroll(
+          allTickers,
+          style: TextStyle(
+            fontSize: fontSize,
+            foreground: Paint()
+              ..style = PaintingStyle.stroke
+              ..strokeWidth = borderWidth
+              ..color = borderColor,
+          ),
+          velocity: Velocity(pixelsPerSecond: Offset(tickerSpeed, 0)),
+          textDirection: textDirection,
+        ),
+        TextScroll(
+          allTickers,
+          style: TextStyle(
+            color: textColor,
+            fontSize: fontSize,
+          ),
+          velocity: Velocity(pixelsPerSecond: Offset(tickerSpeed, 0)),
+          textDirection: textDirection,
+        ),
+      ],
+    );
   }
 
   // Button to re-ask API data for testing

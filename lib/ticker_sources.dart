@@ -1,0 +1,5 @@
+const List<String> tickers = [
+  'Dit is een faketekst. Alles wat hier staat is slechts om een indruk te geven van het grafische effect van tekst op deze plek. Wat u hier leest is een voorbeeldtekst. Deze wordt later vervangen door de uiteindelijke tekst, die nu nog niet bekend is. De faketekst is dus een tekst die eigenlijk nergens over gaat. Het grappige is dat mensen deze toch vaak lezen. Zelfs als men weet dat het om een faketekst gaat, lezen ze toch door.',
+  'Let bij het beoordelen van een vormgeving vooral op de regelafstand en de regellengte. Een regel van ongeveer vijfenzestig tekens leest voor de meeste mensen het prettigst. Wordt de regel langer, dan raakt het oog bij de terugsprong de volgende regel kwijt. Wordt hij korter, dan hakt de tekst in stukjes en gaat het ritme eruit.',
+  'This is placeholder text. Everything you read here exists only to show how a block of copy sits on the page. The words carry no message and the sentences lead nowhere in particular. They will be replaced by the real text once it has been written. Curiously, people read filler text anyway, even after being told that there is nothing in it.'
+];

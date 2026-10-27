@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:flutter_video_test/frame_link.dart';
@@ -13,6 +14,196 @@ class MediaDownloader {
   Future<Directory> get downloadDirectory async {
     final directory = await getApplicationDocumentsDirectory();
     return directory;
+  }
+
+  Future<List<MediaLink>> loadDownloadedMedia() async {
+    final order = await _loadOrder();
+    final mediaEntries = order['media'] as List? ?? const [];
+    final mediaLinks = <MediaLink>[];
+
+    for (final entry in mediaEntries) {
+      if (entry is! Map<String, dynamic>) {
+        continue;
+      }
+
+      final mediaId = entry['id'];
+      if (mediaId is! String || mediaId.isEmpty) continue;
+
+      final duration = entry['duration'] is num ? (entry['duration'] as num).toInt() : null;
+      final localPath = entry['localPath'] is String ? entry['localPath'] as String : null;
+      final link = entry['link'] is String ? entry['link'] as String : localPath;
+      final type = entry['type'] is String ? entry['type'] as String : null;
+      final filePath = localPath ?? await _findFileInDirectory(
+        directoryName: type == 'video' ? 'videos' : 'images',
+        mediaId: mediaId,
+      );
+
+      if (filePath == null || filePath.isEmpty) continue;
+
+      mediaLinks.add(
+        MediaLink(
+          id: mediaId,
+          link: link ?? filePath,
+          type: type ?? (filePath.contains('/videos/') ? 'video' : 'image'),
+          duration: duration,
+          mimeType: entry['mimeType'] is String ? entry['mimeType'] as String : null,
+          localPath: filePath,
+        ),
+      );
+    }
+
+    return mediaLinks;
+  }
+
+  Future<List<FrameLink>> loadDownloadedFrames() async {
+    final order = await _loadOrder();
+    final frameEntries = order['frames'] as List? ?? const [];
+    final frameLinks = <FrameLink>[];
+
+    for (final entry in frameEntries) {
+      if (entry is! Map<String, dynamic>) {
+        continue;
+      }
+
+      final frameId = entry['id'];
+      if (frameId is! String || frameId.isEmpty) continue;
+
+      final duration = entry['duration'] is num ? (entry['duration'] as num).toInt() : null;
+      final localPath = entry['localPath'] is String ? entry['localPath'] as String : null;
+      final link = entry['link'] is String ? entry['link'] as String : localPath;
+      final filePath = localPath ?? await _findFileInDirectory(
+        directoryName: 'frames',
+        mediaId: frameId,
+      );
+      if (filePath == null || filePath.isEmpty) continue;
+
+      frameLinks.add(
+        FrameLink(
+          id: frameId,
+          link: link ?? filePath,
+          type: 'frame',
+          duration: duration,
+          mimeType: entry['mimeType'] is String ? entry['mimeType'] as String : null,
+          localPath: filePath,
+          creationType: entry['creationType'] is String ? entry['creationType'] as String : 'unknown',
+          x1: entry['x1'] is num ? (entry['x1'] as num).toDouble() : 0,
+          y1: entry['y1'] is num ? (entry['y1'] as num).toDouble() : 0,
+          x2: entry['x2'] is num ? (entry['x2'] as num).toDouble() : 0,
+          y2: entry['y2'] is num ? (entry['y2'] as num).toDouble() : 0,
+        ),
+      );
+    }
+
+    return frameLinks;
+  }
+
+  Future<void> _saveDownloadOrder({List<dynamic>? media, List<dynamic>? frames}) async {
+    final directory = await downloadDirectory;
+    final file = File('${directory.path}/download_order.json');
+    final content = await _readOrderFile(file);
+
+    final mediaOrder = <Map<String, dynamic>>[];
+    if (media != null) {
+      for (final item in media) {
+        if (item is MediaLink) {
+          mediaOrder.add({
+            'id': item.id,
+            'type': item.type,
+            'duration': item.duration ?? 0,
+            'localPath': item.localPath,
+            'link': item.link,
+            'mimeType': item.mimeType,
+          });
+        }
+      }
+    } else {
+      mediaOrder.addAll(
+        (content['media'] as List? ?? <dynamic>[])
+            .whereType<Map<String, dynamic>>()
+            .toList(),
+      );
+    }
+
+    final frameOrder = <Map<String, dynamic>>[];
+    if (frames != null) {
+      for (final item in frames) {
+        if (item is FrameLink) {
+          frameOrder.add({
+            'id': item.id,
+            'type': item.type,
+            'duration': item.duration ?? 0,
+            'localPath': item.localPath,
+            'link': item.link,
+            'mimeType': item.mimeType,
+            'creationType': item.creationType,
+            'x1': item.x1,
+            'y1': item.y1,
+            'x2': item.x2,
+            'y2': item.y2,
+          });
+        }
+      }
+    } else {
+      frameOrder.addAll(
+        (content['frames'] as List? ?? <dynamic>[])
+            .whereType<Map<String, dynamic>>()
+            .toList(),
+      );
+    }
+
+    final serialized = <String, dynamic>{
+      'media': mediaOrder,
+      'frames': frameOrder,
+    };
+
+    await file.parent.create(recursive: true);
+    await file.writeAsString(jsonEncode(serialized));
+  }
+
+  Future<Map<String, dynamic>> _readOrderFile(File file) async {
+    if (!await file.exists()) {
+      return <String, dynamic>{'media': <dynamic>[], 'frames': <dynamic>[]};
+    }
+
+    try {
+      final decoded = jsonDecode(await file.readAsString());
+      if (decoded is Map) {
+        final media = decoded['media'] is List ? decoded['media'] as List : <dynamic>[];
+        final frames = decoded['frames'] is List ? decoded['frames'] as List : <dynamic>[];
+        return {
+          'media': media,
+          'frames': frames,
+        };
+      }
+    } catch (_) {}
+
+    return <String, dynamic>{'media': <dynamic>[], 'frames': <dynamic>[]};
+  }
+
+  Future<Map<String, dynamic>> _loadOrder() async {
+    final directory = await downloadDirectory;
+    final file = File('${directory.path}/download_order.json');
+    return _readOrderFile(file);
+  }
+
+  Future<String?> _findFileInDirectory({
+    required String directoryName,
+    required String mediaId,
+  }) async {
+    final directory = await downloadDirectory;
+    final targetDirectory = Directory('${directory.path}/$directoryName');
+    if (!await targetDirectory.exists()) return null;
+
+    final files = targetDirectory.listSync().whereType<File>();
+    for (final file in files) {
+      final name = file.uri.pathSegments.last;
+      final baseName = name.contains('.') ? name.substring(0, name.lastIndexOf('.')) : name;
+      if (baseName == mediaId) {
+        return file.path;
+      }
+    }
+
+    return null;
   }
 
   // Download all media gathered from media_sources
@@ -72,6 +263,18 @@ class MediaDownloader {
           break;
       }
     }
+
+    if (downloadedLinks.any((entry) => entry is MediaLink)) {
+      await _saveDownloadOrder(
+        media: downloadedLinks.whereType<MediaLink>().toList(),
+      );
+    }
+    if (downloadedLinks.any((entry) => entry is FrameLink)) {
+      await _saveDownloadOrder(
+        frames: downloadedLinks.whereType<FrameLink>().toList(),
+      );
+    }
+
     return downloadedLinks;
   }
 
