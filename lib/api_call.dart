@@ -117,7 +117,8 @@ class ApiCall {
       final currentResponseJson = _currentResponseJson;
 
       if (currentResponseJson == null) {
-        throw StateError('Media must be loaded before checking the API.');
+        _pendingResponseJson = jsonString;
+        return true;
       }
 
       final newData = jsonDecode(jsonString);
@@ -137,7 +138,8 @@ class ApiCall {
     if (responseJson == null ||
         _lastActiveScheduleIds == null ||
         _lastActiveScheduleFrameIds == null) {
-      throw StateError('Media must be loaded before checking schedules.');
+      return false;
+      // throw StateError('Media must be loaded before checking schedules.');
     }
 
     final data = jsonDecode(responseJson) as Map<String, dynamic>;
