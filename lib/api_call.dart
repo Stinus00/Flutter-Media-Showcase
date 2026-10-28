@@ -59,6 +59,7 @@ class ApiCall {
       final data = responseJson == null
           ? await _getJsonFromUrl()
           : jsonDecode(responseJson) as Map<String, dynamic>;
+
       final jsonString = await _shortenJsonData(data);
       final media = await _buildMediaFromResponse(
         jsonString,

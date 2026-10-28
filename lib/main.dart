@@ -61,6 +61,7 @@ class _VideoAppState extends State<VideoApp> {
   bool _changingPlaylist = false;
   int _currentLinkIndex = 0;
   int _currentLinkIndexFrame = 0;
+  int? _videoErrorIndex;
   FrameLink? _frameErrorPending;
   // Check API timers
   Timer? _scheduleCheckTimer;
@@ -291,6 +292,7 @@ class _VideoAppState extends State<VideoApp> {
       } catch (error) {
         if (!mounted) return;
         setState(() {
+          _videoErrorIndex = _currentLinkIndex;
           _videoError = "$error\nid: ${media.id}\ntype: ${media.type}";
         });
         return;
@@ -312,6 +314,7 @@ class _VideoAppState extends State<VideoApp> {
       await controller.dispose();
       if (!mounted) return;
       setState(() {
+        _videoErrorIndex = _currentLinkIndex;
         _videoError =
             "$error\nid: ${media.link}\ntype: ${media.type}\ncontroller: ${controller?.value}";
       });
@@ -399,6 +402,7 @@ class _VideoAppState extends State<VideoApp> {
         _currentLinkIndex = 0;
         _imageError = null;
         _videoError = null;
+        _videoErrorIndex = null;
         _imagePath = null;
         _videoPath = null;
         _isChangingVideo = false;
@@ -409,12 +413,16 @@ class _VideoAppState extends State<VideoApp> {
       while (mounted &&
           _mediaLinks.isNotEmpty &&
           (_videoError != null || _imageError != null)) {
-        final failedIndex =
-            _currentLinkIndex < 0 || _currentLinkIndex >= _mediaLinks.length
+        final failedIndex = _videoErrorIndex != null &&
+                _videoErrorIndex! >= 0 &&
+                _videoErrorIndex! < _mediaLinks.length
+            ? _videoErrorIndex!
+            : _currentLinkIndex < 0 || _currentLinkIndex >= _mediaLinks.length
             ? 0
             : _currentLinkIndex;
         final failedMedia = _mediaLinks.removeAt(failedIndex);
         debugPrint('Skipping media ${failedMedia.link} after load error');
+        _videoErrorIndex = null;
 
         _imageTimer?.cancel();
         _imageTimer = null;
@@ -438,7 +446,7 @@ class _VideoAppState extends State<VideoApp> {
         }
 
         _currentLinkIndex =
-            (failedIndex - 1 + _mediaLinks.length) % _mediaLinks.length;
+            (failedIndex - 1) % _mediaLinks.length;
         await _playNextMedia();
       }
     } finally {
@@ -532,6 +540,7 @@ class _VideoAppState extends State<VideoApp> {
       nextController = null;
       if (!mounted) return;
       setState(() {
+        _videoErrorIndex = nextIndex;
         _videoError = '$error\nid: ${media.link}\ntype: ${media.type}';
         _isChangingVideo = false;
       });
@@ -552,6 +561,7 @@ class _VideoAppState extends State<VideoApp> {
     _currentLinkIndex = nextIndex;
     _videoPath = nextVideoPath;
     _videoError = null;
+    _videoErrorIndex = null;
     _imageError = null;
     _imagePath = null;
     _isChangingVideo = false;
@@ -733,12 +743,12 @@ class _VideoAppState extends State<VideoApp> {
           bottom: 0,
           child: _buildTickers(mediaHeight, false),
         ),
-        Positioned(
-          left: 0,
-          right: 0,
-          top: 0,
-          child: _buildTickers(mediaHeight, true),
-        ),
+        // Positioned(
+        //   left: 0,
+        //   right: 0,
+        //   top: 0,
+        //   child: _buildTickers(mediaHeight, true),
+        // ),
       ],
     );
   }
