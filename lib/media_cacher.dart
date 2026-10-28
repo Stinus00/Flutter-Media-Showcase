@@ -218,7 +218,8 @@ class MediaCacher {
       await txn.completed;
     } catch (e) {
       log('Error caching video: $e');
-      rethrow;
+      return '';
+      // rethrow;
     }
 
     return url; // Return the video ID for retrieval later

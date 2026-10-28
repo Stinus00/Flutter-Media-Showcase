@@ -5,7 +5,6 @@ import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_video_test/frame_link.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:flutter_video_test/media_cacher_stub.dart'
     if (dart.library.js_interop) 'package:flutter_video_test/media_cacher.dart';
 import 'package:flutter_video_test/media_downloader.dart';
@@ -124,18 +123,22 @@ class _VideoAppState extends State<VideoApp> {
       }
     } catch (error) {
       if (!mounted) return;
-      final cachedMedia = await _mediaDownloader.loadDownloadedMedia();
-      final cachedFrames = await _mediaDownloader.loadDownloadedFrames();
-      if (cachedMedia.isNotEmpty) {
-        _mediaLinks = cachedMedia;
-        _frameLinks = cachedFrames;
-        _isPreparingMedia = false;
-        _preloadError = null;
-        if (mounted) setState(() {});
-        await _initializeMedia();
-        await _initializeFrame();
-        return;
+      if(!kIsWeb)
+      {
+        final cachedMedia = await _mediaDownloader.loadDownloadedMedia();
+        final cachedFrames = await _mediaDownloader.loadDownloadedFrames();
+        if (cachedMedia.isNotEmpty) {
+          _mediaLinks = cachedMedia;
+          _frameLinks = cachedFrames;
+          _isPreparingMedia = false;
+          _preloadError = null;
+          if (mounted) setState(() {});
+          await _initializeMedia();
+          await _initializeFrame();
+          return;
+        }
       }
+      
       setState(() {
         _isPreparingMedia = false;
         _preloadError = error.toString();
@@ -148,15 +151,27 @@ class _VideoAppState extends State<VideoApp> {
   // // 15 minutes for checking if api changed
   void _startChangeChecks() {
     _scheduleCheckTimer ??= Timer.periodic(const Duration(minutes: 1), (_) {
-      _checkSchedule = true;
       if (_mediaLinks.isEmpty) {
+        setState(() {
+          _preloadError = null;
+        });
         unawaited(_checkForMediaChanges());
+      } else {
+        setState(() {
+          _checkSchedule = true;
+        });
       }
     });
     _payloadCheckTimer ??= Timer.periodic(const Duration(minutes: 15), (_) {
-      _checkPayload = true;
       if (_mediaLinks.isEmpty) {
-        unawaited(_checkForMediaChanges());
+        setState(() {
+          _preloadError = null;
+        });
+        unawaited(_checkForMediaChanges(checkPayload: true));
+      } else {
+        setState(() {
+          _checkPayload = true;
+        });
       }
     });
   }
@@ -712,18 +727,18 @@ class _VideoAppState extends State<VideoApp> {
       alignment: Alignment.bottomCenter,
       children: [
         _buildMediaContent(),
-        // Positioned(
-        //   left: 0,
-        //   right: 0,
-        //   bottom: 0,
-        //   child: _buildTickers(mediaHeight, false),
-        // ),
-        // Positioned(
-        //   left: 0,
-        //   right: 0,
-        //   top: 0,
-        //   child: _buildTickers(mediaHeight, true),
-        // ),
+        Positioned(
+          left: 0,
+          right: 0,
+          bottom: 0,
+          child: _buildTickers(mediaHeight, false),
+        ),
+        Positioned(
+          left: 0,
+          right: 0,
+          top: 0,
+          child: _buildTickers(mediaHeight, true),
+        ),
       ],
     );
   }
