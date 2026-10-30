@@ -54,6 +54,8 @@ class ApiCall {
 
   // Get data from URL
   Future<List<MediaLink>> getMediaFromApi() async {
+    // await _downloader.cleanupAppDirectory();
+
     try {
       final responseJson = _currentResponseJson;
       final data = responseJson == null

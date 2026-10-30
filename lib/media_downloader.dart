@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_video_test/frame_link.dart';
 import 'package:flutter_video_test/media_link.dart';
@@ -14,6 +15,18 @@ class MediaDownloader {
   Future<Directory> get downloadDirectory async {
     final directory = await getApplicationDocumentsDirectory();
     return directory;
+  }
+
+  Future<void> cleanupAppDirectory() async {
+    final directory = await downloadDirectory;
+
+    if(await directory.exists()) {
+      await for (final entity in directory.list()) {
+        await entity.delete(recursive: true);
+      }
+    }
+
+    debugPrint('Cleaned: ${directory.path}');
   }
 
   Future<List<MediaLink>> loadDownloadedMedia() async {
@@ -213,6 +226,7 @@ class MediaDownloader {
     final downloadedLinks = <dynamic>[];
 
     for (final media in links) {
+      debugPrint("(${media.type}) Downloading: ${media.link} as ${media.id!}");
       var path = '';
       switch (media.type) {
         case 'image':
@@ -228,6 +242,8 @@ class MediaDownloader {
               localPath: path,
             ),
           );
+          debugPrint("(${media.type}) Downloaded: ${media.link} to ${path}");
+          debugPrint("-------------------------------------------");
           break;
         case 'video':
           path = await _downloadVideo(link: media.link, name: media.id!);
@@ -242,6 +258,8 @@ class MediaDownloader {
               localPath: path,
             ),
           );
+          debugPrint("(${media.type}) Downloaded: ${media.link} to ${path}");
+          debugPrint("-------------------------------------------");
           break;
         case 'frame':
           path = await _downloadFrame(link: media.link, name: media.id!);
@@ -258,6 +276,8 @@ class MediaDownloader {
               x1: media.x1, x2: media.x2, y1: media.y1, y2: media.y2,
             ),
           );
+          debugPrint("(${media.type}) Downloaded: ${media.link} to ${path}");
+          debugPrint("-------------------------------------------");
           break;
         default:
           break;

@@ -20,6 +20,9 @@ dependencies:
   teno_rrule: ^0.0.10
   text_scroll: ^0.2.1
   video_player: ^2.14.0
+  video_player_media_kit: ^2.0.0
+  media_kit_libs_windows_video: any
+  media_kit_libs_linux: any
   wakelock_plus: ^1.8.0
   web: ^1.1.1
   web_browser_detect: ^2.3.0

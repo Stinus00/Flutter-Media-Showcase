@@ -11,6 +11,7 @@ import 'package:flutter_video_test/media_cacher_stub.dart'
 import 'package:flutter_video_test/media_downloader.dart';
 import 'package:text_scroll/text_scroll.dart';
 import 'package:video_player/video_player.dart';
+import 'package:video_player_media_kit/video_player_media_kit.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
 import 'ticker_sources.dart';
@@ -95,6 +96,12 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
     if (kIsWeb) {
       _reloadTimer = Timer(const Duration(hours: 12), reloadPage);
     }
+
+    VideoPlayerMediaKit.ensureInitialized(
+      windows: true,
+      linux: true,
+    );
+
     _connectivitySubscription = Connectivity().onConnectivityChanged.listen(
       _updateConnectivity,
       onError: (Object error, StackTrace stackTrace) {
