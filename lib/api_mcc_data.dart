@@ -1,5 +1,15 @@
 import 'dart:convert';
 
+int _parseAmount(Object? value) {
+  if (value is int) {
+    return value;
+  }
+  if (value is String) {
+    return int.tryParse(value) ?? 0;
+  }
+  return 0;
+}
+
 class SystemData {
   final String appId;
   final String name;
@@ -492,7 +502,7 @@ class Ticker {
       type: json['type'] ?? '',
       tickerType: json['ticker_type'] ?? 0,
       name: json['name'] ?? '',
-      amount: json['amount'] ?? 0,
+      amount: _parseAmount(json['amount']),
       url: json['url'] ?? '',
     );
   }
@@ -609,7 +619,7 @@ class TickerItem {
   final String name;
   final String? description;
   final int? tickerType;
-  final int? amount;
+  final int amount;
   final String? url;
 
   TickerItem({
@@ -631,7 +641,7 @@ class TickerItem {
       name: json['name'] ?? '',
       description: json['description'],
       tickerType: json['ticker_type'],
-      amount: json['amount'],
+      amount: _parseAmount(json['amount']),
       url: json['url'],
     );
   }
