@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_video_test/frame_link.dart';
 import 'package:flutter_video_test/media_link.dart';
@@ -214,6 +215,7 @@ class MediaDownloader {
 
     for (final media in links) {
       var path = '';
+      debugPrint('(${media.type}) Downloaded ${media.link} as ${media.id!}');
       switch (media.type) {
         case 'image':
           path = await _downloadImage(link: media.link, name: media.id!);

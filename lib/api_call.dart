@@ -186,36 +186,60 @@ class ApiCall {
     String jsonString, {
     required DateTime now,
   }) async {
-    final media = <dynamic>[];
-    final shuffleList = <dynamic>[];
-    final mainList = <dynamic>[];
-    final combinedList = <dynamic>[];
     final mapJson = jsonDecode(jsonString) as Map<String, dynamic>;
     final playlists = mapJson['playlists']['slides'];
     _playlistsMapMedia.clear();
     _mapPlaylists(playlists);
 
-    final groupSchedules = _getGroupSchedules(
-      media,
+    final groupSchedules = _getActiveGroupSchedules(
       mapJson,
       'slides',
       now: now,
     );
-    final systemSchedules = _getSystemSchedules(
-      media,
+    final systemSchedules = _getActiveSystemSchedules(
+      mapJson,
+      'slides',
+      now: now,
+    );
+    final weekGroupSchedules = _getGroupSchedulesForCurrentWeek(
+      mapJson,
+      'slides',
+      now: now,
+    );
+    final weekSystemSchedules = _getSystemSchedulesForCurrentWeek(
       mapJson,
       'slides',
       now: now,
     );
 
-    _getPlaylistData(media, shuffleList, mainList, 'slides');
+    final weekShuffleList = <dynamic>[];
+    final weekMainList = <dynamic>[];
+    _getPlaylistData(
+      [...weekGroupSchedules, ...weekSystemSchedules],
+      weekShuffleList,
+      weekMainList,
+      'slides',
+    );
+    final weekMediaLinks = await _convertMediaToMediaLink([
+      ...weekMainList,
+      ...weekShuffleList,
+    ]);
+    await _downloadMedia(weekMediaLinks);
+
+    final shuffleList = <dynamic>[];
+    final mainList = <dynamic>[];
+    _getPlaylistData(
+      [...groupSchedules, ...systemSchedules],
+      shuffleList,
+      mainList,
+      'slides',
+    );
     shuffleList.shuffle();
 
-    combinedList
-      ..addAll(mainList)
-      ..addAll(shuffleList);
-
-    final mediaLinks = await _convertMediaToMediaLink(combinedList);
+    final mediaLinks = await _convertMediaToMediaLink([
+      ...mainList,
+      ...shuffleList,
+    ]);
     final downloadedMediaLinks = await _downloadMedia(mediaLinks);
     await _saveApiResponse(jsonString);
     _currentResponseJson = jsonString;
@@ -325,27 +349,48 @@ class ApiCall {
     String jsonString, {
     required DateTime now,
   }) async {
-    final frames = <dynamic>[];
-    final mainList = <dynamic>[];
     final mapJson = jsonDecode(jsonString) as Map<String, dynamic>;
     final playlists = mapJson['playlists']['frames'];
     _playlistsMapFrames.clear();
     _mapFramePlaylists(playlists);
 
-    final groupSchedules = _getGroupSchedules(
-      frames,
+    final groupSchedules = _getActiveGroupSchedules(
       mapJson,
       'frames',
       now: now,
     );
-    final systemSchedules = _getSystemSchedules(
-      frames,
+    final systemSchedules = _getActiveSystemSchedules(
+      mapJson,
+      'frames',
+      now: now,
+    );
+    final weekGroupSchedules = _getGroupSchedulesForCurrentWeek(
+      mapJson,
+      'frames',
+      now: now,
+    );
+    final weekSystemSchedules = _getSystemSchedulesForCurrentWeek(
       mapJson,
       'frames',
       now: now,
     );
 
-    _getPlaylistData(frames, List.empty(), mainList, 'frames');
+    final weekMainList = <dynamic>[];
+    _getPlaylistData(
+      [...weekGroupSchedules, ...weekSystemSchedules],
+      List.empty(),
+      weekMainList,
+      'frames',
+    );
+    await _downloadFrames(await _convertFramesToFrameLinks(weekMainList));
+
+    final mainList = <dynamic>[];
+    _getPlaylistData(
+      [...groupSchedules, ...systemSchedules],
+      List.empty(),
+      mainList,
+      'frames',
+    );
 
     final frameLinks = await _convertFramesToFrameLinks(mainList);
     final downloadedFramesLinks = await _downloadFrames(frameLinks);
@@ -362,7 +407,7 @@ class ApiCall {
       final secrets = await _getSecrets();
       _dio.options.headers[secrets['api_header']] = secrets['api_key'];
       final url = secrets['api_url'];
-      final urlNow = '$url?start=${_getCurrentDate()}';
+      final urlNow = '$url?start=${getApiStartDate()}';
 
       final response = await _dio.get(urlNow);
       // await _saveApiResponse(response);
@@ -375,22 +420,6 @@ class ApiCall {
       debugPrint('Error fetching JSON: $e');
       rethrow;
     }
-  }
-
-  // Get the group schedules and return list.
-  List<dynamic> _getGroupSchedules(
-    List<dynamic> media,
-    Map<String, dynamic> data,
-    String type, {
-    DateTime? now,
-  }) {
-    List<dynamic> groupSchedules = _getActiveGroupSchedules(
-      data,
-      type,
-      now: now,
-    );
-    media.addAll(groupSchedules);
-    return groupSchedules;
   }
 
   @visibleForTesting
@@ -415,20 +444,74 @@ class ApiCall {
     }).toList();
   }
 
-  // Get the system schedules and return list
-  List<dynamic> _getSystemSchedules(
-    List<dynamic> media,
+  @visibleForTesting
+  List<dynamic> getGroupSchedulesForCurrentWeek(
+    Map<String, dynamic> data,
+    String type,
+    DateTime? now,
+  ) {
+    return _getSchedulesForCurrentWeek(
+      data,
+      'group_schedules',
+      type,
+      now: now,
+    );
+  }
+
+  @visibleForTesting
+  List<dynamic> getSystemSchedulesForCurrentWeek(
+    Map<String, dynamic> data,
+    String type,
+    DateTime? now,
+  ) {
+    return _getSchedulesForCurrentWeek(
+      data,
+      'system_schedules',
+      type,
+      now: now,
+    );
+  }
+
+  List<dynamic> _getGroupSchedulesForCurrentWeek(
     Map<String, dynamic> data,
     String type, {
     DateTime? now,
   }) {
-    List<dynamic> systemSchedules = _getActiveSystemSchedules(
+    return _getSchedulesForCurrentWeek(
       data,
+      'group_schedules',
       type,
       now: now,
     );
-    media.addAll(systemSchedules);
-    return systemSchedules;
+  }
+
+  List<dynamic> _getSystemSchedulesForCurrentWeek(
+    Map<String, dynamic> data,
+    String type, {
+    DateTime? now,
+  }) {
+    return _getSchedulesForCurrentWeek(
+      data,
+      'system_schedules',
+      type,
+      now: now,
+    );
+  }
+
+  List<dynamic> _getSchedulesForCurrentWeek(
+    Map<String, dynamic> data,
+    String scheduleType,
+    String type, {
+    DateTime? now,
+  }) {
+    final schedules =
+        (data[scheduleType] as Map<String, dynamic>)[type] as List<dynamic>;
+    return schedules.where((schedule) {
+      return _occursDuringCurrentWeek(
+        schedule as Map<String, dynamic>,
+        now: now,
+      );
+    }).toList();
   }
 
   @visibleForTesting
@@ -503,6 +586,63 @@ class ApiCall {
       return !currentTime.isBefore(start) && currentTime.isBefore(end);
     }
 
+    final rule = _parseRecurrenceRule(slide, start, recurrenceRule);
+    final startOfToday = DateTime(
+      currentTime.year,
+      currentTime.month,
+      currentTime.day,
+    );
+    final tomorrow = startOfToday.add(const Duration(days: 1));
+    final duration = end.difference(start);
+
+    return rule.between(startOfToday.subtract(duration), tomorrow).any((
+      occurrenceStart,
+    ) {
+      final occurrenceEnd = occurrenceStart.add(duration);
+      return !currentTime.isBefore(occurrenceStart) &&
+          currentTime.isBefore(occurrenceEnd);
+    });
+  }
+
+  bool _occursDuringCurrentWeek(
+    Map<String, dynamic> slide, {
+    DateTime? now,
+  }) {
+    final start = _parseApiDateTime(slide['start'] as String);
+    final end = _parseApiDateTime(slide['end'] as String);
+    if (!end.isAfter(start)) {
+      throw FormatException('Schedule end must be after start.');
+    }
+
+    final currentTime = now ?? DateTime.now();
+    final startOfWeek = DateTime(
+      currentTime.year,
+      currentTime.month,
+      currentTime.day - currentTime.weekday + 1,
+    );
+    final endOfWeek = startOfWeek.add(const Duration(days: 7));
+    final duration = end.difference(start);
+    final recurrenceRule = (slide['recurrence_rule'] as String?)?.trim();
+
+    if (recurrenceRule == null || recurrenceRule.isEmpty) {
+      return start.isBefore(endOfWeek) && end.isAfter(startOfWeek);
+    }
+
+    final rule = _parseRecurrenceRule(slide, start, recurrenceRule);
+    return rule.between(startOfWeek.subtract(duration), endOfWeek).any((
+      occurrenceStart,
+    ) {
+      final occurrenceEnd = occurrenceStart.add(duration);
+      return occurrenceStart.isBefore(endOfWeek) &&
+          occurrenceEnd.isAfter(startOfWeek);
+    });
+  }
+
+  RecurrenceRule _parseRecurrenceRule(
+    Map<String, dynamic> slide,
+    DateTime start,
+    String recurrenceRule,
+  ) {
     final exceptionDates = (slide['recurrence_exception'] as String? ?? '')
         .trim();
     final localExceptionDates = exceptionDates
@@ -521,23 +661,7 @@ class ApiCall {
         'Invalid recurrence rule for slide ${slide['id']}.',
       );
     }
-
-    // Add today
-    final startOfToday = DateTime(
-      currentTime.year,
-      currentTime.month,
-      currentTime.day,
-    );
-    final tomorrow = startOfToday.add(const Duration(days: 1));
-    final duration = end.difference(start);
-
-    return rule.between(startOfToday.subtract(duration), tomorrow).any((
-      occurrenceStart,
-    ) {
-      final occurrenceEnd = occurrenceStart.add(duration);
-      return !currentTime.isBefore(occurrenceStart) &&
-          currentTime.isBefore(occurrenceEnd);
-    });
+    return rule;
   }
 
   // Place playlists in dictionary for easier retrieval later
@@ -773,12 +897,15 @@ class ApiCall {
     return jsonString;
   }
 
-  // Get current date
-  String _getCurrentDate() {
-    var now = DateTime.now();
-    var formatter = DateFormat('yyyy-MM-dd');
-    String formattedDate = formatter.format(now);
-    return formattedDate;
+  @visibleForTesting
+  String getApiStartDate({DateTime? now}) {
+    final currentTime = now ?? DateTime.now();
+    final startOfWeek = DateTime(
+      currentTime.year,
+      currentTime.month,
+      currentTime.day - currentTime.weekday + 1,
+    );
+    return DateFormat('yyyy-MM-dd').format(startOfWeek);
   }
 
   DateTime _parseApiDateTime(String value) {

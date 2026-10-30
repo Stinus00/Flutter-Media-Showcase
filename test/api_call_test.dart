@@ -190,6 +190,40 @@ void main() {
     });
   });
 
+  group('getGroupSchedulesForCurrentWeek', () {
+    test('includes schedules anywhere in the Monday-to-Monday week', () {
+      final data = {
+        'group_schedules': {
+          'slides': [
+            {
+              'id': 42,
+              'start': '2026-10-06T08:00:00.000Z',
+              'end': '2026-10-06T10:00:00.000Z',
+            },
+            {
+              'id': 43,
+              'start': '2026-10-11T22:00:00.000Z',
+              'end': '2026-10-12T01:00:00.000Z',
+            },
+            {
+              'id': 44,
+              'start': '2026-10-12T08:00:00.000Z',
+              'end': '2026-10-12T10:00:00.000Z',
+            },
+          ],
+        },
+      };
+
+      final schedules = ApiCall().getGroupSchedulesForCurrentWeek(
+        data,
+        'slides',
+        DateTime(2026, 10, 7, 12),
+      );
+
+      expect(schedules.map((schedule) => schedule['id']), [42, 43]);
+    });
+  });
+
   group('getActiveSystemSchedules', () {
     final apiCall = ApiCall();
 
@@ -256,6 +290,29 @@ void main() {
       expect(activeSlides.map((slide) => slide['id']), [1558, 1561]);
       expect(expiredSlides, isEmpty);
     });
+  });
+
+  group('getSystemSchedulesForCurrentWeek', () {
+    test('includes recurring and one-off schedules later this week', () {
+      final schedules = ApiCall().getSystemSchedulesForCurrentWeek(
+        decodeScheduleResponse(),
+        'slides',
+        DateTime(2026, 10, 6, 9),
+      );
+
+      expect(schedules.map((schedule) => schedule['id']), [1558, 1560, 1561]);
+    });
+  });
+
+  test('requests API data starting on Monday of the current week', () {
+    expect(
+      ApiCall().getApiStartDate(now: DateTime(2026, 10, 11, 12)),
+      '2026-10-05',
+    );
+    expect(
+      ApiCall().getApiStartDate(now: DateTime(2026, 10, 5, 12)),
+      '2026-10-05',
+    );
   });
 
   group('getActiveScheduleIds', () {
