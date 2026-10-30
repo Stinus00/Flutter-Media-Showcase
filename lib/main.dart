@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
 
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_video_test/frame_link.dart';
@@ -27,7 +28,7 @@ class VideoApp extends StatefulWidget {
   State<VideoApp> createState() => _VideoAppState();
 }
 
-class _VideoAppState extends State<VideoApp> {
+class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
   final MediaCacher _mediaCacher = MediaCacher();
   final ApiCall _apiCall = ApiCall();
   final MediaDownloader _mediaDownloader = MediaDownloader();
@@ -66,6 +67,9 @@ class _VideoAppState extends State<VideoApp> {
   // Check API timers
   Timer? _scheduleCheckTimer;
   Timer? _payloadCheckTimer;
+  StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
+  bool? _hasNetworkConnection;
+  int _connectivityRevision = 0;
   // Check API booleans
   bool _checkSchedule = false;
   bool _checkPayload = false;
@@ -91,7 +95,56 @@ class _VideoAppState extends State<VideoApp> {
     if (kIsWeb) {
       _reloadTimer = Timer(const Duration(hours: 12), reloadPage);
     }
+    _connectivitySubscription = Connectivity().onConnectivityChanged.listen(
+      _updateConnectivity,
+      onError: (Object error, StackTrace stackTrace) {
+        FlutterError.reportError(
+          FlutterErrorDetails(
+            exception: error,
+            stack: stackTrace,
+            library: 'connectivity monitoring',
+          ),
+        );
+      },
+    );
+    unawaited(_checkConnectivity());
     unawaited(_prepareMedia(startChangeChecks: true));
+  }
+
+  Future<void> _checkConnectivity() async {
+    final revision = _connectivityRevision;
+    try {
+      final connectivityResult = await Connectivity().checkConnectivity();
+      if (revision == _connectivityRevision) {
+        _updateConnectivity(connectivityResult);
+      }
+    } catch (error, stackTrace) {
+      FlutterError.reportError(
+        FlutterErrorDetails(
+          exception: error,
+          stack: stackTrace,
+          library: 'connectivity check',
+        ),
+      );
+    }
+  }
+
+  void _updateConnectivity(List<ConnectivityResult> connectivityResult) {
+    _connectivityRevision++;
+    final hasConnection = connectivityResult.any(
+      (result) => result != ConnectivityResult.none,
+    );
+    if (!mounted || _hasNetworkConnection == hasConnection) return;
+    setState(() {
+      _hasNetworkConnection = hasConnection;
+    });
+  }
+
+  Future<bool> checkIsInternetConnection() async {
+    final connectivityResult = await Connectivity().checkConnectivity();
+    return connectivityResult.any(
+      (result) => result != ConnectivityResult.none,
+    );
   }
 
   // Start Next Playlist
@@ -151,6 +204,9 @@ class _VideoAppState extends State<VideoApp> {
   // // 1 minute for checking if schedules changed
   // // 15 minutes for checking if api changed
   void _startChangeChecks() {
+    _scheduleCheckTimer?.cancel();
+    _payloadCheckTimer?.cancel();
+
     _scheduleCheckTimer ??= Timer.periodic(const Duration(minutes: 1), (_) {
       if (_mediaLinks.isEmpty) {
         setState(() {
@@ -719,6 +775,36 @@ class _VideoAppState extends State<VideoApp> {
                   bottom: 16,
                   child: _buildNextPlaylistButton(),
                 ),
+                if (_hasNetworkConnection == false)
+                  Align(
+                    alignment: Alignment.topLeft,
+                    child: 
+                    Stack(
+                      alignment: Alignment.topLeft,
+                      children: [
+                        // White silhouette behind the original transparent image
+                        Transform.translate(
+                          offset: const Offset(-2.5, -2.5),
+                          child: ColorFiltered(
+                            colorFilter: const ColorFilter.mode(
+                              Colors.black,
+                              BlendMode.srcIn,
+                            ),
+                            child: Image.asset(
+                              'assets/no-internet.png',
+                              width: 85,
+                            ),
+                          ),
+                        ),
+
+                        Image.asset(
+                          'assets/no-internet.png',
+                          width: 80,
+                          color: Colors.red,
+                        ),
+                      ],
+                    )
+                  )
               ],
             );
           },
@@ -993,12 +1079,23 @@ class _VideoAppState extends State<VideoApp> {
     );
   }
 
+  // Restart Timers after app has been to background.
+  @override
+  void didChangeAppLifecycleState(
+      AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      // Restart the periodic timer.
+      _startChangeChecks();
+    }
+  }
+
   // Dispose of the controller and cancel the timer when the widget is disposed.
   @override
   void dispose() {
     _imageTimer?.cancel();
     _frameTimer?.cancel();
     _reloadTimer?.cancel();
+    unawaited(_connectivitySubscription?.cancel());
     _controller?.dispose();
     _scheduleCheckTimer?.cancel();
     _payloadCheckTimer?.cancel();
