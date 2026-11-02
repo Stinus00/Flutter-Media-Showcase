@@ -17,6 +17,7 @@ class MediaDownloader {
     return directory;
   }
 
+  // Cleanup app directory based on testing.
   Future<void> cleanupAppDirectory() async {
     final directory = await downloadDirectory;
 
@@ -29,6 +30,7 @@ class MediaDownloader {
     debugPrint('Cleaned: ${directory.path}');
   }
 
+  // Load the downloaded media from the app directory based on the download order.
   Future<List<MediaLink>> loadDownloadedMedia() async {
     final order = await _loadOrder();
     final mediaEntries = order['media'] as List? ?? const [];
@@ -68,6 +70,7 @@ class MediaDownloader {
     return mediaLinks;
   }
 
+  // Load the downloaded frames from the app directory based on the download order.
   Future<List<FrameLink>> loadDownloadedFrames() async {
     final order = await _loadOrder();
     final frameEntries = order['frames'] as List? ?? const [];
@@ -110,6 +113,7 @@ class MediaDownloader {
     return frameLinks;
   }
 
+  // Save the download order in a JSON file incase app starts without internet connection.
   Future<void> _saveDownloadOrder({List<dynamic>? media, List<dynamic>? frames}) async {
     final directory = await downloadDirectory;
     final file = File('${directory.path}/json/download_order.json');
@@ -173,6 +177,7 @@ class MediaDownloader {
     await file.writeAsString(jsonEncode(serialized));
   }
 
+  // Read the download order from JSON file in case app starts without internet connection.
   Future<Map<String, dynamic>> _readOrderFile(File file) async {
     if (!await file.exists()) {
       return <String, dynamic>{'media': <dynamic>[], 'frames': <dynamic>[]};
@@ -193,12 +198,14 @@ class MediaDownloader {
     return <String, dynamic>{'media': <dynamic>[], 'frames': <dynamic>[]};
   }
 
+  // Load the download order from JSON file in case app starts without internet connection.
   Future<Map<String, dynamic>> _loadOrder() async {
     final directory = await downloadDirectory;
     final file = File('${directory.path}/download_order.json');
     return _readOrderFile(file);
   }
 
+  // Find the file in the directory based on mediaId and directoryName.
   Future<String?> _findFileInDirectory({
     required String directoryName,
     required String mediaId,

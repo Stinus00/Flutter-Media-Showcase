@@ -366,6 +366,14 @@ class ApiCall {
       final url = secrets['api_url'];
       final urlNow = '$url?start=${_getCurrentDate()}';
 
+      // final response = { "statusCode": 200, "data": {} }; // Placeholder for actual API call
+      // final response = await _dio.get(urlNow);
+      // await _saveApiResponse(response);
+      // if (response.statusCode == 200) {
+      //   return response.data;
+      // if (response['statusCode'] == 200) {
+      //   return response['data'] as Map<String, dynamic>;
+
       final response = await _dio.get(urlNow);
       // await _saveApiResponse(response);
       if (response.statusCode == 200) {

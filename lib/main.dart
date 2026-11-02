@@ -102,6 +102,7 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
       linux: true,
     );
 
+    // Listen for connectivity changes and update state accordingly.
     _connectivitySubscription = Connectivity().onConnectivityChanged.listen(
       _updateConnectivity,
       onError: (Object error, StackTrace stackTrace) {
@@ -118,6 +119,7 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
     unawaited(_prepareMedia(startChangeChecks: true));
   }
 
+  // Check connectivity and update state if it has changed.
   Future<void> _checkConnectivity() async {
     final revision = _connectivityRevision;
     try {
@@ -136,6 +138,7 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
     }
   }
 
+  // Update connectivity status and set state if it has changed.
   void _updateConnectivity(List<ConnectivityResult> connectivityResult) {
     _connectivityRevision++;
     final hasConnection = connectivityResult.any(
@@ -147,6 +150,7 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
     });
   }
 
+  // Return true or false wether there is an internet connection or not.
   Future<bool> checkIsInternetConnection() async {
     final connectivityResult = await Connectivity().checkConnectivity();
     return connectivityResult.any(
@@ -385,6 +389,8 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
     }
   }
 
+  // Initialize frame and set timer for frame.
+  // // Update frame coordinates to know where media has to play.
   Future<void> _initializeFrame() async {
     final mediaFrame = _currentMediaFrame;
     _frameErrorPending = null;
@@ -403,6 +409,7 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
     return;
   }
 
+  // Update the frame coordinates gotten from the current frame.
   void _updateFrameCoordinates(FrameLink? frame) {
     x1 = frame?.x1;
     y1 = frame?.y1;
@@ -434,6 +441,7 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
     );
   }
 
+  // Start frame timer
   void _startFrameTimer(FrameLink mediaFrame) {
     _frameTimer?.cancel();
     _frameTimer = Timer(
@@ -442,6 +450,7 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
     );
   }
 
+  // Skip current media if there's an error.
   void _skipMedia() {
     if (_isSkippingMedia || (_videoError == null && _imageError == null)) {
       return;
@@ -451,6 +460,7 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
     scheduleMicrotask(() => unawaited(_skipFailedMedia()));
   }
 
+  // Skip failed media and play next media.
   Future<void> _skipFailedMedia() async {
     try {
       if (mounted && _mediaLinks.isEmpty) {
@@ -536,6 +546,7 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
     unawaited(_playNextFrame());
   }
 
+  // Handle frame error and skip frame.
   void _handleFrameError(FrameLink frame, Object error) {
     if (!identical(_currentMediaFrame, frame) ||
         identical(_frameErrorPending, frame)) {
@@ -704,6 +715,7 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
     }
   }
 
+  // Check if tehre are any pending media changes.
   Future<void> _checkPendingMediaChanges() async {
     if (_checkSchedule) {
       _checkSchedule = false;
@@ -715,6 +727,7 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
     }
   }
 
+  // Play next frame.
   Future<void> _playNextFrame() async {
     if (_frameLinks.isEmpty) return;
 
@@ -755,6 +768,9 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
             return Stack(
               alignment: Alignment.center,
               children: [
+                // Check if there's frame coordinates. 
+                // // If there is build frame and put media inside frame.
+                // // If there isn't just build media.
                 if (x1 != null)
                   Center(
                     child: SizedBox(
@@ -846,6 +862,7 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
     );
   }
 
+  // Build the media content.
   Widget _buildMediaContent() {
     if (_isPreparingMedia) {
       return const CircularProgressIndicator();
@@ -947,6 +964,7 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
         : const CircularProgressIndicator();
   }
 
+  // Handle image loading error and set state to display the error message.
   void _handleMediaImageError(MediaLink media, Object error) {
     if (!identical(_currentMedia, media) || _imageError != null) return;
     scheduleMicrotask(() {
@@ -959,6 +977,7 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
     });
   }
 
+  // Build the frames.
   Widget _buildMediaFrame() {
     if (_isPreparingMedia) {
       return const CircularProgressIndicator();
@@ -1010,6 +1029,8 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
           );
   }
 
+  // Build tickers widget.
+  // // Scrolling text across screen gotten from either news sources or custom.
   Widget _buildTickers(double mediaHeight, bool backwards) {
     String allTickers = '';
     for (String ticker in tickers) {

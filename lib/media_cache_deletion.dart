@@ -7,6 +7,7 @@ class MediaCacheDeletion {
 
   final MediaCacher _mediaCacher;
 
+  // Delete media that isn't present in API response
   Future<void> deleteMediaNotInApi({
     required Set<String> imageIds,
     required Set<String> videoIds,
@@ -17,6 +18,7 @@ class MediaCacheDeletion {
     await _deleteStoreEntries('frames', frameIds);
   }
 
+  // Check which media is cached based on id and delete the ones that aren't in API.
   Future<void> _deleteStoreEntries(String store, Set<String> apiIds) async {
     final cachedIds = await _mediaCacher.getMediaKeysWeb(store);
     print('Checking for Deletion ---- $store');
