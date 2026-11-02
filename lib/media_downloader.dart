@@ -13,7 +13,7 @@ class MediaDownloader {
   final Dio _dio;
 
   Future<Directory> get downloadDirectory async {
-    final directory = await getApplicationDocumentsDirectory();
+    final directory = await getApplicationSupportDirectory();
     return directory;
   }
 
@@ -112,7 +112,7 @@ class MediaDownloader {
 
   Future<void> _saveDownloadOrder({List<dynamic>? media, List<dynamic>? frames}) async {
     final directory = await downloadDirectory;
-    final file = File('${directory.path}/download_order.json');
+    final file = File('${directory.path}/json/download_order.json');
     final content = await _readOrderFile(file);
 
     final mediaOrder = <Map<String, dynamic>>[];
