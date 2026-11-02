@@ -578,6 +578,32 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
   // // Load next video from file if not on web
   // // Initialize next video controller
   Future<void> _playNextVideo(int nextIndex, MediaLink media) async {
+    final controller = _controller;
+    controller?.removeListener(_handleVideoState);
+    _controller = null;
+    if (mounted) setState(() {});
+
+    try {
+      await controller?.dispose();
+    } catch (error, stackTrace) {
+      FlutterError.reportError(
+        FlutterErrorDetails(
+          exception: error,
+          stack: stackTrace,
+          library: 'video controller disposal',
+        ),
+      );
+      if (!mounted) return;
+      setState(() {
+        _videoErrorIndex = nextIndex;
+        _videoError = 'Could not release previous video: $error';
+        _isChangingVideo = false;
+      });
+      return;
+    }
+
+    if (!mounted) return;
+
     VideoPlayerController? nextController;
     String? nextVideoPath;
 
@@ -617,8 +643,6 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
       return;
     }
 
-    var controller = _controller;
-    controller?.removeListener(_handleVideoState);
     readyController.addListener(_handleVideoState);
     _controller = readyController;
     _currentLinkIndex = nextIndex;
@@ -630,8 +654,6 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
     _isChangingVideo = false;
     setState(() {});
 
-    await controller?.dispose();
-    controller = null;
     await _evictActiveImage();
     await _checkPendingMediaChanges();
     _handleVideoState();
