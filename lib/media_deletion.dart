@@ -8,6 +8,7 @@ class MediaDeletion {
 
   final MediaDownloader _mediaDownloader;
 
+  // Delete media that isn't present in API response
   Future<void> deleteMediaNotInApi({
     required Set<String> imageIds,
     required Set<String> videoIds,
