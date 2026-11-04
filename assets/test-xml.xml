@@ -1,0 +1,40 @@
+<BCM_Frame>
+    <Name>Combi Frame Curls {001}.png</Name>
+    <QtyTextBlock>1</QtyTextBlock>
+    <QtyVideoBlock>1</QtyVideoBlock>
+    <TextBlockList>
+        <TextBlock>
+            <TB_Index>1</TB_Index>
+            <TB_BlockPosition>520;838</TB_BlockPosition>
+            <TB_BlockSize>1330;210</TB_BlockSize>
+            <TB_TextblockPosition>80;20</TB_TextblockPosition>
+            <TB_TextblockSize>1230;170</TB_TextblockSize>
+            <TB_ImagePossible>True</TB_ImagePossible>
+            <TB_ImagePosition>1040;15</TB_ImagePosition>
+            <TB_ImageSize>260;180</TB_ImageSize>
+            <TB_ALT_TextblockPosition>80;20</TB_ALT_TextblockPosition>
+            <TB_ALT_TextblockSize>940;170</TB_ALT_TextblockSize>
+            <TB_IconSet>000</TB_IconSet>
+            <TB_FontName>Arial</TB_FontName>
+            <TB_FontSize>40</TB_FontSize>
+            <TB_FontStyle>Regular</TB_FontStyle>
+            <TB_HorizontalAlignment>Center</TB_HorizontalAlignment>
+            <TB_VerticalAlignment>Center</TB_VerticalAlignment>
+            <TB_FontColor>255;25;25;25</TB_FontColor>
+            <TB_Dropshadow>True</TB_Dropshadow>
+            <TB_IconSize>60;190</TB_IconSize>
+            <TB_IconPosition>10;10</TB_IconPosition>
+            <TB_IconName_User>skull.png</TB_IconName_User>
+            <TB_InLineIconSize>60;60</TB_InLineIconSize>
+            <TB_UseHalfWidthCalc>False</TB_UseHalfWidthCalc>
+        </TextBlock>
+    </TextBlockList>
+    <VideoBlockList>
+        <VideoBlock>
+            <VB_Index>0</VB_Index>
+            <VB_BlockPosition>538;48</VB_BlockPosition>
+            <VB_BlockSize>1294;730</VB_BlockSize>
+            <VB_Type>Both</VB_Type>
+        </VideoBlock>
+    </VideoBlockList>
+</BCM_Frame>

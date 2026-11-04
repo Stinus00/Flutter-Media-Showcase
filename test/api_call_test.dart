@@ -105,13 +105,88 @@ Map<String, dynamic> decodeScheduleResponse() =>
 void main() {
   group('getActiveGroupSchedules', () {
     final apiCall = ApiCall();
+
     test('does not include a schedule', () {
       final activeSlides = apiCall.getActiveGroupSchedules(
         decodeScheduleResponse(),
+        'slides',
         DateTime(2026, 10, 6, 9),
       );
 
       expect(activeSlides, isEmpty);
+    });
+
+    test('includes a one-off schedule inside its start/end window', () {
+      final data = {
+        'group_schedules': {
+          'slides': [
+            {
+              'id': 42,
+              'start': '2026-10-06T08:00:00.000Z',
+              'end': '2026-10-06T10:00:00.000Z',
+            },
+          ],
+        },
+      };
+
+      final activeSlides = apiCall.getActiveGroupSchedules(
+        data,
+        'slides',
+        DateTime(2026, 10, 6, 9),
+      );
+
+      expect(activeSlides.map((slide) => slide['id']), [42]);
+    });
+
+    test('includes the start boundary but excludes the end boundary', () {
+      final data = {
+        'group_schedules': {
+          'slides': [
+            {
+              'id': 42,
+              'start': '2026-10-06T08:00:00.000Z',
+              'end': '2026-10-06T10:00:00.000Z',
+            },
+          ],
+        },
+      };
+
+      final atStart = apiCall.getActiveGroupSchedules(
+        data,
+        'slides',
+        DateTime(2026, 10, 6, 8),
+      );
+      final atEnd = apiCall.getActiveGroupSchedules(
+        data,
+        'slides',
+        DateTime(2026, 10, 6, 10),
+      );
+
+      expect(atStart.map((slide) => slide['id']), [42]);
+      expect(atEnd, isEmpty);
+    });
+
+    test('rejects a schedule whose end is not after its start', () {
+      final data = {
+        'group_schedules': {
+          'slides': [
+            {
+              'id': 42,
+              'start': '2026-10-06T08:00:00.000Z',
+              'end': '2026-10-06T08:00:00.000Z',
+            },
+          ],
+        },
+      };
+
+      expect(
+        () => apiCall.getActiveGroupSchedules(
+          data,
+          'slides',
+          DateTime(2026, 10, 6, 8),
+        ),
+        throwsFormatException,
+      );
     });
   });
 
@@ -121,6 +196,7 @@ void main() {
     test('includes schedules active during their recurring time window', () {
       final activeSlides = apiCall.getActiveSystemSchedules(
         decodeScheduleResponse(),
+        'slides',
         DateTime(2026, 10, 6, 9),
       );
 
@@ -130,6 +206,7 @@ void main() {
     test('excludes recurrence exception dates', () {
       final activeSlides = apiCall.getActiveSystemSchedules(
         decodeScheduleResponse(),
+        'slides',
         DateTime(2026, 10, 7, 9),
       );
 
@@ -139,6 +216,7 @@ void main() {
     test('does not include a schedule at its end time', () {
       final activeSlides = apiCall.getActiveSystemSchedules(
         decodeScheduleResponse(),
+        'slides',
         DateTime(2026, 10, 7, 18),
       );
 
@@ -148,11 +226,13 @@ void main() {
     test('exception moved', () {
       final activeSlides = apiCall.getActiveSystemSchedules(
         decodeScheduleResponse(),
+        'slides',
         DateTime(2026, 10, 8, 8, 30),
       );
 
       final inactiveSlides = apiCall.getActiveSystemSchedules(
         decodeScheduleResponse(),
+        'slides',
         DateTime(2026, 10, 8, 8),
       );
 
@@ -163,11 +243,13 @@ void main() {
     test('includes a one-off schedule only inside its start/end window', () {
       final activeSlides = apiCall.getActiveSystemSchedules(
         decodeScheduleResponse(),
+        'slides',
         DateTime(2026, 10, 8, 8, 30),
       );
 
       final expiredSlides = apiCall.getActiveSystemSchedules(
         decodeScheduleResponse(),
+        'slides',
         DateTime(2026, 10, 8, 18, 28, 48),
       );
 

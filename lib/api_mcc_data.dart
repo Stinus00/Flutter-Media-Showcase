@@ -509,43 +509,27 @@ class Ticker {
 
 class FrameItem {
   final String id;
-  final String regionId;
   final String type;
-  final String name;
-  final String? description;
-  final String? imageId;
   final MediaImage? image;
   final FrameProperties? properties;
   final String? datetimeStart;
   final String? datetimeEnd;
   final bool deleteAfterEnd;
-  final int? playlistCount;
-  final List<PlaylistInfo> playlists;
 
   FrameItem({
     required this.id,
-    required this.regionId,
     required this.type,
-    required this.name,
-    required this.description,
-    required this.imageId,
     required this.image,
     required this.properties,
     required this.datetimeStart,
     required this.datetimeEnd,
     required this.deleteAfterEnd,
-    required this.playlistCount,
-    required this.playlists,
   });
 
   factory FrameItem.fromJson(Map<String, dynamic> json) {
     return FrameItem(
       id: json['id']?.toString() ?? '',
-      regionId: json['region_id'] ?? '',
-      type: json['type'] ?? '',
-      name: json['name'] ?? '',
-      description: json['description'],
-      imageId: json['image_id']?.toString(),
+      type: json['type']?.toString() ?? '',
       image: json['image'] != null
           ? MediaImage.fromJson(json['image'])
           : null,
@@ -555,27 +539,16 @@ class FrameItem {
       datetimeStart: json['datetime_start'],
       datetimeEnd: json['datetime_end'],
       deleteAfterEnd: json['delete_after_end'] ?? false,
-      playlistCount: json['playlist_count'],
-      playlists: (json['playlists'] as List? ?? [])
-          .map((e) => PlaylistInfo.fromJson(e))
-          .toList(),
     );
   }
 
   Map<String, dynamic> toJson() => {
         'id': id,
-        'region_id': regionId,
-        'type': type,
-        'name': name,
-        'description': description,
-        'image_id': imageId,
         'image': image?.toJson(),
         'properties': properties?.toJson(),
         'datetime_start': datetimeStart,
         'datetime_end': datetimeEnd,
         'delete_after_end': deleteAfterEnd,
-        'playlist_count': playlistCount,
-        'playlists': playlists.map((e) => e.toJson()).toList(),
       };
 }
 
