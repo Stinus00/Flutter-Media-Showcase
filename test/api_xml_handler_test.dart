@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:flutter_video_test/api_xml_handler.dart';
+import 'package:flutter_video_test/api/api_xml_handler.dart';
 
 void main() {
   final handler = ApiXmlHandler();

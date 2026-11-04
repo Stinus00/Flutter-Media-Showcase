@@ -1,5 +1,5 @@
-import 'package:flutter_video_test/media_cacher_stub.dart'
-    if (dart.library.js_interop) 'package:flutter_video_test/media_cacher.dart';
+import 'package:flutter_video_test/cache_download/media_cacher_stub.dart'
+    if (dart.library.js_interop) 'package:flutter_video_test/cache_download/media_cacher.dart';
 
 class MediaCacheDeletion {
   MediaCacheDeletion({MediaCacher? mediaCacher})

@@ -4,16 +4,16 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_video_test/api_mcc_data.dart';
-import 'package:flutter_video_test/errors.dart';
-import 'package:flutter_video_test/media_cache_deletion.dart';
-import 'package:flutter_video_test/api_xml_handler.dart';
-import 'package:flutter_video_test/frame_link.dart';
-import 'package:flutter_video_test/media_cacher_stub.dart'
-    if (dart.library.js_interop) 'package:flutter_video_test/media_cacher.dart';
-import 'package:flutter_video_test/media_deletion.dart';
-import 'package:flutter_video_test/media_downloader.dart';
-import 'package:flutter_video_test/media_link.dart';
+import 'package:flutter_video_test/classes/api_mcc_data.dart';
+import 'package:flutter_video_test/classes/errors.dart';
+import 'package:flutter_video_test/cache_download/media_cache_deletion.dart';
+import 'package:flutter_video_test/api/api_xml_handler.dart';
+import 'package:flutter_video_test/classes/frame_link.dart';
+import 'package:flutter_video_test/cache_download/media_cacher_stub.dart'
+    if (dart.library.js_interop) 'package:flutter_video_test/cache_download/media_cacher.dart';
+import 'package:flutter_video_test/app_download/media_deletion.dart';
+import 'package:flutter_video_test/app_download/media_downloader.dart';
+import 'package:flutter_video_test/classes/media_link.dart';
 import 'package:intl/intl.dart';
 import 'package:teno_rrule/teno_rrule.dart';
 
@@ -660,7 +660,7 @@ class ApiCall {
     List<FrameLink> frameLinks = [];
     for (var item in frames) {
       final type = 'frame';
-      final duration = item['interval_minutes'] * 60 * 1000;
+      final duration = item['interval_minutes'] * 1 * 1000;
       final url = item['image']['url'];
       final id = item['image']['id'];
       final mimeType = getMimeType(type, item);

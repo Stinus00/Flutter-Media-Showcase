@@ -1,5 +1,13 @@
 class MediaLink {
-  const MediaLink({required this.link, required this.type, this.duration, this.id, this.blobUrl, this.mimeType, this.localPath});
+  const MediaLink({
+    required this.link,
+    required this.type,
+    this.duration,
+    this.id,
+    this.blobUrl,
+    this.mimeType,
+    this.localPath,
+  });
 
   final String? id;
   final String link;

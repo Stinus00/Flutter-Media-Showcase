@@ -5,20 +5,20 @@ import 'dart:math' as math;
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_video_test/frame_link.dart';
-import 'package:flutter_video_test/media_cacher_stub.dart'
-    if (dart.library.js_interop) 'package:flutter_video_test/media_cacher.dart';
-import 'package:flutter_video_test/media_downloader.dart';
+import 'package:flutter_video_test/classes/frame_link.dart';
+import 'package:flutter_video_test/cache_download/media_cacher_stub.dart'
+    if (dart.library.js_interop) 'package:flutter_video_test/cache_download/media_cacher.dart';
+import 'package:flutter_video_test/app_download/media_downloader.dart';
 import 'package:text_scroll/text_scroll.dart';
 import 'package:video_player/video_player.dart';
 import 'package:video_player_media_kit/video_player_media_kit.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
-import 'ticker_sources.dart';
-import 'media_link.dart';
-import 'api_call.dart';
-import 'page_reloader_stub.dart'
-    if (dart.library.js_interop) 'page_reloader.dart';
+import 'sources/ticker_sources.dart';
+import 'classes/media_link.dart';
+import 'api/api_call.dart';
+import 'cache_download/page_reloader_stub.dart'
+    if (dart.library.js_interop) 'cache_download/page_reloader.dart';
 
 void main() => runApp(const VideoApp());
 
@@ -89,6 +89,8 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
   FrameLink? get _currentMediaFrame =>
       _frameLinks.isEmpty ? null : _frameLinks[_currentLinkIndexFrame];
 
+  String allTickers = '';
+
   @override
   void initState() {
     super.initState();
@@ -97,10 +99,7 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
       _reloadTimer = Timer(const Duration(hours: 12), reloadPage);
     }
 
-    VideoPlayerMediaKit.ensureInitialized(
-      windows: true,
-      linux: true,
-    );
+    VideoPlayerMediaKit.ensureInitialized(windows: true, linux: true);
 
     _connectivitySubscription = Connectivity().onConnectivityChanged.listen(
       _updateConnectivity,
@@ -182,10 +181,14 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
       if (startChangeChecks) {
         _startChangeChecks();
       }
+
+      for (String ticker in tickers) {
+        allTickers += ' • ';
+        allTickers += ticker;
+      }
     } catch (error) {
       if (!mounted) return;
-      if(!kIsWeb)
-      {
+      if (!kIsWeb) {
         final cachedMedia = await _mediaDownloader.loadDownloadedMedia();
         final cachedFrames = await _mediaDownloader.loadDownloadedFrames();
         if (cachedMedia.isNotEmpty) {
@@ -199,7 +202,7 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
           return;
         }
       }
-      
+
       setState(() {
         _isPreparingMedia = false;
         _preloadError = error.toString();
@@ -476,7 +479,8 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
       while (mounted &&
           _mediaLinks.isNotEmpty &&
           (_videoError != null || _imageError != null)) {
-        final failedIndex = _videoErrorIndex != null &&
+        final failedIndex =
+            _videoErrorIndex != null &&
                 _videoErrorIndex! >= 0 &&
                 _videoErrorIndex! < _mediaLinks.length
             ? _videoErrorIndex!
@@ -508,8 +512,7 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
           return;
         }
 
-        _currentLinkIndex =
-            (failedIndex - 1) % _mediaLinks.length;
+        _currentLinkIndex = (failedIndex - 1) % _mediaLinks.length;
         await _playNextMedia();
       }
     } finally {
@@ -755,6 +758,9 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
             return Stack(
               alignment: Alignment.center,
               children: [
+                // Check if there's frame coordinates.
+                // // If there is build frame and put media inside frame.
+                // // If there isn't just build media.
                 if (x1 != null)
                   Center(
                     child: SizedBox(
@@ -768,7 +774,9 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
                             top: y1! * scale,
                             width: (x2! - x1!) * scale,
                             height: (y2! - y1!) * scale,
-                            child: ClipRect(child: _buildMedia((y2! - y1!) * scale)),
+                            child: ClipRect(
+                              child: _buildMedia((y2! - y1!) * scale),
+                            ),
                           ),
                           if (creationType == 'bcm') _buildMediaFrame(),
                         ],
@@ -785,8 +793,7 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
                 if (_hasNetworkConnection == false)
                   Align(
                     alignment: Alignment.topLeft,
-                    child: 
-                    Stack(
+                    child: Stack(
                       alignment: Alignment.topLeft,
                       children: [
                         // White silhouette behind the original transparent image
@@ -810,8 +817,8 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
                           color: Colors.red,
                         ),
                       ],
-                    )
-                  )
+                    ),
+                  ),
               ],
             );
           },
@@ -854,7 +861,10 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
     if (_preloadError != null) {
       final media = _currentMedia;
       final localPath = media?.localPath;
-      if (!kIsWeb && media != null && localPath != null && File(localPath).existsSync()) {
+      if (!kIsWeb &&
+          media != null &&
+          localPath != null &&
+          File(localPath).existsSync()) {
         return Image.file(
           File(localPath),
           fit: BoxFit.contain,
@@ -873,14 +883,13 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
     // If there's a video error, skip media and display the error temporarily.
     if (_videoError != null) {
       _skipMedia();
-      return
-        Padding(
-          padding: const EdgeInsets.all(24),
-          child: Text(
-            'Could not load video:\n$_videoError\n$_videoPath',
-            textAlign: TextAlign.center,
-          ),
-        );
+      return Padding(
+        padding: const EdgeInsets.all(24),
+        child: Text(
+          'Could not load video:\n$_videoError\n$_videoPath',
+          textAlign: TextAlign.center,
+        ),
+      );
     }
 
     // If there's an image error, skip media and display the error temporarily.
@@ -1011,13 +1020,7 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
   }
 
   Widget _buildTickers(double mediaHeight, bool backwards) {
-    String allTickers = '';
-    for (String ticker in tickers) {
-      allTickers += ticker;
-      allTickers += ' • ';
-    }
-
-    final percent = 0.1;
+    final percent = 0.06;
     final fontSize = mediaHeight * percent;
     const textColor = Colors.white;
     const borderColor = Colors.black;
@@ -1041,10 +1044,7 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
         ),
         TextScroll(
           allTickers,
-          style: TextStyle(
-            color: textColor,
-            fontSize: fontSize,
-          ),
+          style: TextStyle(color: textColor, fontSize: fontSize),
           velocity: Velocity(pixelsPerSecond: Offset(tickerSpeed, 0)),
           textDirection: textDirection,
         ),
@@ -1088,8 +1088,7 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
 
   // Restart Timers after app has been to background.
   @override
-  void didChangeAppLifecycleState(
-      AppLifecycleState state) {
+  void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       // Restart the periodic timer.
       _startChangeChecks();

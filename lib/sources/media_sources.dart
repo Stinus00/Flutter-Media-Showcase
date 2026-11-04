@@ -1,6 +1,6 @@
-import 'package:flutter_video_test/frame_link.dart';
+import 'package:flutter_video_test/classes/frame_link.dart';
 
-import 'media_link.dart';
+import '../classes/media_link.dart';
 
 // Temporary links for testing
 // Images and Videos
@@ -21,27 +21,27 @@ import 'media_link.dart';
 //     type: 'video',
 //   ),
 //   MediaLink(
-//     link: 'https://s3.eu-central-003.backblazeb2.com/bcm-test-stijn/images/sample%206.png', 
+//     link: 'https://s3.eu-central-003.backblazeb2.com/bcm-test-stijn/images/sample%206.png',
 //     type: "image",
 //     duration: 7000
 //   ),
 //   MediaLink(
-//     link: 'https://s3.eu-central-003.backblazeb2.com/bcm-test-stijn/images/sample%207.png', 
+//     link: 'https://s3.eu-central-003.backblazeb2.com/bcm-test-stijn/images/sample%207.png',
 //     type: "image",
 //     duration: 6000
 //   ),
 //   MediaLink(
-//     link: 'https://s3.eu-central-003.backblazeb2.com/bcm-test-stijn/images/tania-mousinho-YlpfE9uCakE-unsplash.jpg', 
+//     link: 'https://s3.eu-central-003.backblazeb2.com/bcm-test-stijn/images/tania-mousinho-YlpfE9uCakE-unsplash.jpg',
 //     type: "image",
 //     duration: 4000
 //   ),
 //   MediaLink(
-//     link: 'https://s3.eu-central-003.backblazeb2.com/bcm-test-stijn/images/timo-volz-ZlFKIG6dApg-unsplash.jpg', 
+//     link: 'https://s3.eu-central-003.backblazeb2.com/bcm-test-stijn/images/timo-volz-ZlFKIG6dApg-unsplash.jpg',
 //     type: "image",
 //     duration: 10000
 //   ),
 //   MediaLink(
-//     link: 'https://s3.eu-central-003.backblazeb2.com/bcm-test-stijn/images/beertje.jpg', 
+//     link: 'https://s3.eu-central-003.backblazeb2.com/bcm-test-stijn/images/beertje.jpg',
 //     type: "image",
 //     duration: 5000
 //   ),
@@ -68,7 +68,7 @@ import 'media_link.dart';
 // ];
 
 // Empty
-const List <MediaLink> mediaLinks = [
+const List<MediaLink> mediaLinks = [
   // Broken video
   // MediaLink(
   //   link: 'https://s3.eu-central-003.backblazeb2.com/bcm-test-stijn/video/Neil%20Diamond%20-%20Sweet%20Caroline%20%28Live%201969%29.mp4',
@@ -79,36 +79,79 @@ const List <MediaLink> mediaLinks = [
     type: "video",
   ),
   MediaLink(
-    link: 'https://s3.eu-central-003.backblazeb2.com/bcm-test-stijn/images/tania-mousinho-YlpfE9uCakE-unsplash.jpg', 
+    link: 'https://s3.eu-central-003.backblazeb2.com/bcm-test-stijn/images/tania-mousinho-YlpfE9uCakE-unsplash.jpg',
     type: "image",
-    duration: 4000
+    duration: 4000,
   ),
   MediaLink(
-    link: 'https://s3.eu-central-003.backblazeb2.com/bcm-test-stijn/images/timo-volz-ZlFKIG6dApg-unsplash.jpg', 
+    link: 'https://s3.eu-central-003.backblazeb2.com/bcm-test-stijn/images/timo-volz-ZlFKIG6dApg-unsplash.jpg',
     type: "image",
-    duration: 10000
+    duration: 10000,
   ),
   MediaLink(
-    link: 'https://s3.eu-central-003.backblazeb2.com/bcm-test-stijn/images/beertje.jpg', 
+    link: 'https://s3.eu-central-003.backblazeb2.com/bcm-test-stijn/images/beertje.jpg',
     type: "image",
-    duration: 5000
+    duration: 5000,
   ),
 ];
 
 const List<FrameLink> mediaLinksFrames = [
   // MediaLink(link:'https://s3.eu-central-003.backblazeb2.com/bcmdatabucket1/graphics/templateimages_n/0010/ftp_0042%20X1=275%20Y1=154%20X2=1645%20Y2=926.png', type: 'image', duration: 10000),
-  FrameLink(link:'https://s3.eu-central-003.backblazeb2.com/bcmdatabucket1/graphics/templateimages_n/0010/ftp_0043%20X1=275%20Y1=154%20X2=1645%20Y2=926.png', type:'frame', creationType: 'bcm', duration:15000, id: 'name1', x1: 275, y1:154, x2:1645, y2:926),
   FrameLink(
-    link: 'https://s3.eu-central-003.backblazeb2.com/bcm-test-stijn/images/beertje.jpg', 
+    link: 'https://s3.eu-central-003.backblazeb2.com/bcmdatabucket1/graphics/templateimages_n/0010/ftp_0043%20X1=275%20Y1=154%20X2=1645%20Y2=926.png',
+    type: 'frame',
+    creationType: 'bcm',
+    duration: 15000,
+    id: 'name1',
+    x1: 275,
+    y1: 154,
+    x2: 1645,
+    y2: 926,
+  ),
+  FrameLink(
+    link: 'https://s3.eu-central-003.backblazeb2.com/bcm-test-stijn/images/beertje.jpg',
     type: "frame",
     creationType: "custom",
     duration: 15000,
     id: 'custom1',
-    x1: 305, y1:184, x2:1675, y2:956
+    x1: 305,
+    y1: 184,
+    x2: 1675,
+    y2: 956,
   ),
-  FrameLink(link:'https://s3.eu-central-003.backblazeb2.com/bcmdatabucket1/graphics/templateimages_n/0037/ftp_0270%20X1%3D477%20Y1%3D154%20X2%3D1847%20Y2%3D926.png', type:'frame', creationType: 'bcm', duration:15000, id: 'name2', x1: 477, y1:154, x2:1847, y2:926),
-  FrameLink(link:'https://s3.eu-central-003.backblazeb2.com/bcmdatabucket1/graphics/templateimages_n/0010/ftp_0045%20X1=275%20Y1=154%20X2=1645%20Y2=926.png', type:'frame', creationType: 'bcm', duration:15000, id: 'name3', x1: 275, y1:154, x2:1645, y2:926),
-  FrameLink(link:'https://s3.eu-central-003.backblazeb2.com/bcmdatabucket1/graphics/templateimages_n/0037/ftp_0271%20X1%3D477%20Y1%3D154%20X2%3D1847%20Y2%3D926.png', type:'frame', duration:15000, creationType: 'bcm', id: 'name4', x1: 477, y1:154, x2:1847, y2:926),
+  FrameLink(
+    link: 'https://s3.eu-central-003.backblazeb2.com/bcmdatabucket1/graphics/templateimages_n/0037/ftp_0270%20X1%3D477%20Y1%3D154%20X2%3D1847%20Y2%3D926.png',
+    type: 'frame',
+    creationType: 'bcm',
+    duration: 15000,
+    id: 'name2',
+    x1: 477,
+    y1: 154,
+    x2: 1847,
+    y2: 926,
+  ),
+  FrameLink(
+    link: 'https://s3.eu-central-003.backblazeb2.com/bcmdatabucket1/graphics/templateimages_n/0010/ftp_0045%20X1=275%20Y1=154%20X2=1645%20Y2=926.png',
+    type: 'frame',
+    creationType: 'bcm',
+    duration: 15000,
+    id: 'name3',
+    x1: 275,
+    y1: 154,
+    x2: 1645,
+    y2: 926,
+  ),
+  FrameLink(
+    link: 'https://s3.eu-central-003.backblazeb2.com/bcmdatabucket1/graphics/templateimages_n/0037/ftp_0271%20X1%3D477%20Y1%3D154%20X2%3D1847%20Y2%3D926.png',
+    type: 'frame',
+    duration: 15000,
+    creationType: 'bcm',
+    id: 'name4',
+    x1: 477,
+    y1: 154,
+    x2: 1847,
+    y2: 926,
+  ),
   // MediaLink(link:'https://s3.eu-central-003.backblazeb2.com/bcmdatabucket1/graphics/templateimages_n/0010/ftp_0046%20X1=275%20Y1=154%20X2=1645%20Y2=926.png', type:'image',duration:4000),
   // MediaLink(link:'https://s3.eu-central-003.backblazeb2.com/bcmdatabucket1/graphics/templateimages_n/0010/ftp_0047%20X1=275%20Y1=154%20X2=1645%20Y2=926.png', type:'image',duration:4000),
   // MediaLink(link:'https://s3.eu-central-003.backblazeb2.com/bcmdatabucket1/graphics/templateimages_n/0037/ftp_0272%20X1%3D73%20Y1%3D235%20X2%3D1443%20Y2%3D1007.png', type:'image', duration:4000),
@@ -129,7 +172,7 @@ const List<FrameLink> mediaLinksFrames = [
   // ),
   // Broken video
   // MediaLink(
-  //   link: 'https://s3.eu-central-003.backblazeb2.com/bcm-test-stijn/video/Martin%20Solveig%20ft%20Sam%20White%20-%20Plus%201%20%28Tujamo%20Remix%29.mp4', 
+  //   link: 'https://s3.eu-central-003.backblazeb2.com/bcm-test-stijn/video/Martin%20Solveig%20ft%20Sam%20White%20-%20Plus%201%20%28Tujamo%20Remix%29.mp4',
   //   type: 'video'
   // ),
 ];

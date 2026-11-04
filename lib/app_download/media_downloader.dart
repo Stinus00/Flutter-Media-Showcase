@@ -1,9 +1,10 @@
 import 'dart:convert';
 import 'dart:io';
+
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_video_test/frame_link.dart';
-import 'package:flutter_video_test/media_link.dart';
+import 'package:flutter_video_test/classes/frame_link.dart';
+import 'package:flutter_video_test/classes/media_link.dart';
 
 import 'package:dio/dio.dart';
 import 'package:path_provider/path_provider.dart';
@@ -20,7 +21,7 @@ class MediaDownloader {
   Future<void> cleanupAppDirectory() async {
     final directory = await downloadDirectory;
 
-    if(await directory.exists()) {
+    if (await directory.exists()) {
       await for (final entity in directory.list()) {
         await entity.delete(recursive: true);
       }
@@ -42,14 +43,22 @@ class MediaDownloader {
       final mediaId = entry['id'];
       if (mediaId is! String || mediaId.isEmpty) continue;
 
-      final duration = entry['duration'] is num ? (entry['duration'] as num).toInt() : null;
-      final localPath = entry['localPath'] is String ? entry['localPath'] as String : null;
-      final link = entry['link'] is String ? entry['link'] as String : localPath;
+      final duration = entry['duration'] is num
+          ? (entry['duration'] as num).toInt()
+          : null;
+      final localPath = entry['localPath'] is String
+          ? entry['localPath'] as String
+          : null;
+      final link = entry['link'] is String
+          ? entry['link'] as String
+          : localPath;
       final type = entry['type'] is String ? entry['type'] as String : null;
-      final filePath = localPath ?? await _findFileInDirectory(
-        directoryName: type == 'video' ? 'videos' : 'images',
-        mediaId: mediaId,
-      );
+      final filePath =
+          localPath ??
+          await _findFileInDirectory(
+            directoryName: type == 'video' ? 'videos' : 'images',
+            mediaId: mediaId,
+          );
 
       if (filePath == null || filePath.isEmpty) continue;
 
@@ -59,7 +68,9 @@ class MediaDownloader {
           link: link ?? filePath,
           type: type ?? (filePath.contains('/videos/') ? 'video' : 'image'),
           duration: duration,
-          mimeType: entry['mimeType'] is String ? entry['mimeType'] as String : null,
+          mimeType: entry['mimeType'] is String
+              ? entry['mimeType'] as String
+              : null,
           localPath: filePath,
         ),
       );
@@ -81,13 +92,18 @@ class MediaDownloader {
       final frameId = entry['id'];
       if (frameId is! String || frameId.isEmpty) continue;
 
-      final duration = entry['duration'] is num ? (entry['duration'] as num).toInt() : null;
-      final localPath = entry['localPath'] is String ? entry['localPath'] as String : null;
-      final link = entry['link'] is String ? entry['link'] as String : localPath;
-      final filePath = localPath ?? await _findFileInDirectory(
-        directoryName: 'frames',
-        mediaId: frameId,
-      );
+      final duration = entry['duration'] is num
+          ? (entry['duration'] as num).toInt()
+          : null;
+      final localPath = entry['localPath'] is String
+          ? entry['localPath'] as String
+          : null;
+      final link = entry['link'] is String
+          ? entry['link'] as String
+          : localPath;
+      final filePath =
+          localPath ??
+          await _findFileInDirectory(directoryName: 'frames', mediaId: frameId);
       if (filePath == null || filePath.isEmpty) continue;
 
       frameLinks.add(
@@ -96,9 +112,13 @@ class MediaDownloader {
           link: link ?? filePath,
           type: 'frame',
           duration: duration,
-          mimeType: entry['mimeType'] is String ? entry['mimeType'] as String : null,
+          mimeType: entry['mimeType'] is String
+              ? entry['mimeType'] as String
+              : null,
           localPath: filePath,
-          creationType: entry['creationType'] is String ? entry['creationType'] as String : 'unknown',
+          creationType: entry['creationType'] is String
+              ? entry['creationType'] as String
+              : 'unknown',
           x1: entry['x1'] is num ? (entry['x1'] as num).toDouble() : 0,
           y1: entry['y1'] is num ? (entry['y1'] as num).toDouble() : 0,
           x2: entry['x2'] is num ? (entry['x2'] as num).toDouble() : 0,
@@ -110,7 +130,11 @@ class MediaDownloader {
     return frameLinks;
   }
 
-  Future<void> _saveDownloadOrder({List<dynamic>? media, List<dynamic>? frames}) async {
+  // Save the download order in a JSON file incase app starts without internet connection.
+  Future<void> _saveDownloadOrder({
+    List<dynamic>? media,
+    List<dynamic>? frames,
+  }) async {
     final directory = await downloadDirectory;
     final file = File('${directory.path}/json/download_order.json');
     final content = await _readOrderFile(file);
@@ -181,12 +205,13 @@ class MediaDownloader {
     try {
       final decoded = jsonDecode(await file.readAsString());
       if (decoded is Map) {
-        final media = decoded['media'] is List ? decoded['media'] as List : <dynamic>[];
-        final frames = decoded['frames'] is List ? decoded['frames'] as List : <dynamic>[];
-        return {
-          'media': media,
-          'frames': frames,
-        };
+        final media = decoded['media'] is List
+            ? decoded['media'] as List
+            : <dynamic>[];
+        final frames = decoded['frames'] is List
+            ? decoded['frames'] as List
+            : <dynamic>[];
+        return {'media': media, 'frames': frames};
       }
     } catch (_) {}
 
@@ -195,7 +220,7 @@ class MediaDownloader {
 
   Future<Map<String, dynamic>> _loadOrder() async {
     final directory = await downloadDirectory;
-    final file = File('${directory.path}/download_order.json');
+    final file = File('${directory.path}/json/download_order.json');
     return _readOrderFile(file);
   }
 
@@ -210,7 +235,9 @@ class MediaDownloader {
     final files = targetDirectory.listSync().whereType<File>();
     for (final file in files) {
       final name = file.uri.pathSegments.last;
-      final baseName = name.contains('.') ? name.substring(0, name.lastIndexOf('.')) : name;
+      final baseName = name.contains('.')
+          ? name.substring(0, name.lastIndexOf('.'))
+          : name;
       if (baseName == mediaId) {
         return file.path;
       }
@@ -220,9 +247,7 @@ class MediaDownloader {
   }
 
   // Download all media gathered from media_sources
-  Future<List<dynamic>> downloadAllMedia({
-    required List<dynamic> links,
-  }) async {
+  Future<List<dynamic>> downloadAllMedia({required List<dynamic> links}) async {
     final downloadedLinks = <dynamic>[];
 
     for (final media in links) {
@@ -273,7 +298,10 @@ class MediaDownloader {
               mimeType: media.mimeType,
               localPath: path,
               creationType: media.creationType,
-              x1: media.x1, x2: media.x2, y1: media.y1, y2: media.y2,
+              x1: media.x1,
+              x2: media.x2,
+              y1: media.y1,
+              y2: media.y2,
             ),
           );
           debugPrint("(${media.type}) Downloaded: ${media.link} to ${path}");
@@ -307,7 +335,9 @@ class MediaDownloader {
     // Get image directory
     final directory = await downloadDirectory;
     final imageDirectory = Directory('${directory.path}/images');
-    final file = File('${imageDirectory.path}/$name.${_getFileExtension(link)}');
+    final file = File(
+      '${imageDirectory.path}/$name.${_getFileExtension(link)}',
+    );
 
     try {
       if (!await file.exists()) {
@@ -331,19 +361,17 @@ class MediaDownloader {
     required String name,
     void Function(int received, int total)? onReceiveProgress,
   }) async {
-
     // Get video directory
     final directory = await downloadDirectory;
     final videoDirectory = Directory('${directory.path}/videos');
-    final file = File('${videoDirectory.path}/$name.${_getFileExtension(link)}');
+    final file = File(
+      '${videoDirectory.path}/$name.${_getFileExtension(link)}',
+    );
 
     // File in assets folder
-    if (!_checkHttp(link) && _checkAsset(link)){
+    if (!_checkHttp(link) && _checkAsset(link)) {
       final byteData = await rootBundle.load(link);
-      await file.writeAsBytes(
-        byteData.buffer.asUint8List(),
-        flush: true,
-      );
+      await file.writeAsBytes(byteData.buffer.asUint8List(), flush: true);
       return file.path;
     }
 
@@ -372,7 +400,9 @@ class MediaDownloader {
   }) async {
     final directory = await downloadDirectory;
     final frameDirectory = Directory('${directory.path}/frames');
-    final file = File('${frameDirectory.path}/$name.${_getFileExtension(link)}');
+    final file = File(
+      '${frameDirectory.path}/$name.${_getFileExtension(link)}',
+    );
 
     try {
       if (!await file.exists()) {

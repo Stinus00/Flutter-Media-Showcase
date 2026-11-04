@@ -1,5 +1,18 @@
 class FrameLink {
-  const FrameLink({required this.link, required this.type, this.duration, this.id, this.blobUrl, this.mimeType, this.localPath, this.creationType, required this.x1, required this.y1, required this.x2, required this.y2});
+  const FrameLink({
+    required this.link,
+    required this.type,
+    this.duration,
+    this.id,
+    this.blobUrl,
+    this.mimeType,
+    this.localPath,
+    this.creationType,
+    required this.x1,
+    required this.y1,
+    required this.x2,
+    required this.y2,
+  });
 
   final String? id;
   final String link;

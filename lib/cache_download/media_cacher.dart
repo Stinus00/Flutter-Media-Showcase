@@ -1,6 +1,6 @@
 import 'package:flutter/services.dart';
-import 'package:flutter_video_test/frame_link.dart';
-import 'package:flutter_video_test/media_link.dart';
+import 'package:flutter_video_test/classes/frame_link.dart';
+import 'package:flutter_video_test/classes/media_link.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 
 import 'dart:developer';
@@ -51,9 +51,7 @@ class MediaCacher {
   }
 
   // Go through the list to download/cache all media.
-  Future<List<dynamic>> cacheAllMedia({
-    required List<dynamic> links,
-  }) async {
+  Future<List<dynamic>> cacheAllMedia({required List<dynamic> links}) async {
     final downloadedLinks = <dynamic>[];
     DefaultCacheManager().emptyCache();
 
@@ -102,7 +100,7 @@ class MediaCacher {
               x1: media.x1,
               y1: media.y1,
               x2: media.x2,
-              y2: media.y2
+              y2: media.y2,
             ),
           );
           break;
@@ -154,8 +152,8 @@ class MediaCacher {
     });
   }
 
-  // Get or create a blob URL for the given key. 
-  // // If the blob URL is already cached, return it. 
+  // Get or create a blob URL for the given key.
+  // // If the blob URL is already cached, return it.
   // // Otherwise, create a new blob URL using the provided `create` function and cache it.
   Future<String> _getOrCreateBlobUrl(
     String key,
@@ -236,7 +234,7 @@ class MediaCacher {
   //     }
   //   }
   // }
-                               
+
   // Put image into IndexedDB
   Future<String> _cacheWebImage(
     String imageId,
