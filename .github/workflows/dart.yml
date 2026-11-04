@@ -39,10 +39,10 @@ jobs:
       - name: Create secrets.json
         shell: bash
         env:
-          APP_SECRETS_JSON: ${{ secrets.APP_SECRETS_JSON }}
+          APP_SECRETS_JSON: ${{ secrets.API_SECRETS }}
         run: |
           mkdir -p assets/json
-          printf '%s' "$APP_SECRETS_JSON" > assets/json/secrets.json
+          printf '%s' "$API_SECRETS" > assets/json/secrets.json
 
       - name: Install dependencies
         run: flutter pub get
