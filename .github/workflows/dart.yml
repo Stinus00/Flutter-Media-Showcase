@@ -1,44 +1,68 @@
-# This workflow uses actions that are not certified by GitHub.
-# They are provided by a third-party and are governed by
-# separate terms of service, privacy policy, and support
-# documentation.
 
-name: Dart
+name: Flutter CI
 
 on:
   push:
-    branches: [ "main" ]
+    branches:
+      - main
+      - dev
   pull_request:
-    branches: [ "main" ]
+    branches:
+      - main
+      - dev
+  workflow_dispatch:
 
 jobs:
-  build-and-test:
+  flutter-ci:
+    name: Flutter CI
     runs-on: ubuntu-latest
 
     steps:
-      - name: Clone repository
-        uses: actions/checkout@v6
-        
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
           channel: stable
-          flutter-version-file: pubspec.yaml # path to pubspec.yaml or .fvmrc or .fvm/fvm_config.json
-      - run: flutter --version
-      
+          cache: true
+
+      - name: Show Flutter version
+        run: flutter --version
+
       - name: Install dependencies
         run: flutter pub get
 
-      # Uncomment this step to verify the use of 'dart format' on each commit.
-      # - name: Verify formatting
-      #   run: dart format --output=none --set-exit-if-changed .
+      - name: Check formatting
+        run: dart format --output=none --set-exit-if-changed .
 
-      # Consider passing '--fatal-infos' for slightly stricter analysis.
-      - name: Analyze project source
+      - name: Analyze project
         run: flutter analyze
 
-      # Your project will need to have tests in test/ and a dependency on
-      # package:test for this step to succeed. Note that Flutter projects will
-      # want to change this to 'flutter test'.
       - name: Run tests
-        run: flutter test
+        run: flutter test --coverage
+
+      - name: Build Android APK
+        run: flutter build apk --debug
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: flutter-android-apk
+          path: build/app/outputs/flutter-apk/app-debug.apk
+          retention-days: 7
+
+      - name: Upload test coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: flutter-test-coverage
+          path: coverage/lcov.info
+          if-no-files-found: ignore
+          retention-days: 7
