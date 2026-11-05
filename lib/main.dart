@@ -5,11 +5,11 @@ import 'dart:math' as math;
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_video_test/classes/custom_ticker.dart';
 import 'package:flutter_video_test/classes/frame_link.dart';
 import 'package:flutter_video_test/cache_download/media_cacher_stub.dart'
     if (dart.library.js_interop) 'package:flutter_video_test/cache_download/media_cacher.dart';
 import 'package:flutter_video_test/app_download/media_downloader.dart';
-import 'package:text_scroll/text_scroll.dart';
 import 'package:video_player/video_player.dart';
 import 'package:video_player_media_kit/video_player_media_kit.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
@@ -840,15 +840,15 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
         Positioned(
           left: 0,
           right: 0,
-          bottom: 0,
+          bottom: -5,
           child: _buildTickers(mediaHeight, false),
         ),
-        // Positioned(
-        //   left: 0,
-        //   right: 0,
-        //   top: 0,
-        //   child: _buildTickers(mediaHeight, true),
-        // ),
+        Positioned(
+          left: 0,
+          right: 0,
+          top: 0,
+          child: _buildTickers(mediaHeight, true),
+        ),
       ],
     );
   }
@@ -1020,35 +1020,22 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
   }
 
   Widget _buildTickers(double mediaHeight, bool backwards) {
-    final percent = 0.06;
+    final percent = 0.10;
     final fontSize = mediaHeight * percent;
     const textColor = Colors.white;
     const borderColor = Colors.black;
     final borderWidth = fontSize * 0.1;
-    final tickerSpeed = fontSize;
-    final textDirection = backwards ? TextDirection.rtl : TextDirection.ltr;
-
-    return Stack(
-      children: <Widget>[
-        TextScroll(
-          allTickers,
-          style: TextStyle(
-            fontSize: fontSize,
-            foreground: Paint()
-              ..style = PaintingStyle.stroke
-              ..strokeWidth = borderWidth
-              ..color = borderColor,
-          ),
-          velocity: Velocity(pixelsPerSecond: Offset(tickerSpeed, 0)),
-          textDirection: textDirection,
-        ),
-        TextScroll(
-          allTickers,
-          style: TextStyle(color: textColor, fontSize: fontSize),
-          velocity: Velocity(pixelsPerSecond: Offset(tickerSpeed, 0)),
-          textDirection: textDirection,
-        ),
-      ],
+    final tickerSpeed = 1 * fontSize * 1;
+    return CustomTicker(
+      tickers,
+      tickerSpeed: tickerSpeed,
+      tickerFontSize: fontSize,
+      tickerSymbol: '•',
+      leftToRight: backwards,
+      border: true,
+      borderColor: borderColor,
+      borderWidth: borderWidth,
+      textColor: textColor,
     );
   }
 

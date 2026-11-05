@@ -660,7 +660,7 @@ class ApiCall {
     List<FrameLink> frameLinks = [];
     for (var item in frames) {
       final type = 'frame';
-      final duration = item['interval_minutes'] * 1 * 1000;
+      final duration = item['interval_minutes'] * 60 * 1000;
       final url = item['image']['url'];
       final id = item['image']['id'];
       final mimeType = getMimeType(type, item);
