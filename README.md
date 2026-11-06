@@ -17,7 +17,10 @@ A flutter project for viewing video's, images, frames and tickers, managed by th
   You can run these scripts using "sh *script name*.sh" in the project terminal.
 
   **build-for-web.sh** - Builds the program for web and starts a localhost server on which it runs
+  
   **build-universal.sh** - Used to create APK's for Android. Open the zip file in build/app/outputs/bundle/release/ and transfer the APK to your Android device.
+  
   **clean-and-build.sh** - Cleans the project and builds for all available platforms.
+
 
   **!! PROJECTS CAN ONLY BE BUILD ON THEIR RESPECTIVE PLATFORMS** For example: You can't build a Windows application on a MacOS device
