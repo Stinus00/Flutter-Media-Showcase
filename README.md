@@ -23,4 +23,4 @@ A flutter project for viewing video's, images, frames and tickers, managed by th
   **clean-and-build.sh** - Cleans the project and builds for all available platforms.
 
 
-  **!! PROJECTS CAN ONLY BE BUILD ON THEIR RESPECTIVE PLATFORMS** For example: You can't build a Windows application on a MacOS device
+  **!! PROJECTS CAN ONLY BE BUILD ON THEIR RESPECTIVE PLATFORMS !!** For example: You can't build a Windows application on a MacOS device
