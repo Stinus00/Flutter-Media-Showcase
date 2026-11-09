@@ -916,11 +916,13 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
 
     final media = _currentMedia!;
 
+    Widget child;
+
     // Return Image on web
     // Return Image File on web
     if (media.type == 'image') {
       if (kIsWeb) {
-        return _imagePath == null
+        child = _imagePath == null
             ? const CircularProgressIndicator()
             : Image(
                 image: _activeImageProvider!,
@@ -932,28 +934,47 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
                   return const SizedBox.shrink();
                 },
               );
+      } else {
+        child = _imagePath == null
+            ? const CircularProgressIndicator()
+            : Image.file(
+                File(_imagePath!),
+                fit: BoxFit.contain,
+                height: double.infinity,
+                width: double.infinity,
+                errorBuilder: (context, error, stackTrace) {
+                  _handleMediaImageError(media, error);
+                  return const SizedBox.shrink();
+                },
+              );
       }
-      return _imagePath == null
-          ? const CircularProgressIndicator()
-          : Image.file(
-              File(_imagePath!),
-              fit: BoxFit.contain,
-              height: double.infinity,
-              width: double.infinity,
-              errorBuilder: (context, error, stackTrace) {
-                _handleMediaImageError(media, error);
-                return const SizedBox.shrink();
-              },
-            );
+    } else {
+      // Return Video if its not an image
+      child = _controller?.value.isInitialized ?? false
+          ? AspectRatio(
+              aspectRatio: _controller!.value.aspectRatio,
+              child: VideoPlayer(_controller!),
+            )
+          : const CircularProgressIndicator();
     }
 
-    // Return Video if its not an image
-    return _controller?.value.isInitialized ?? false
-        ? AspectRatio(
-            aspectRatio: _controller!.value.aspectRatio,
-            child: VideoPlayer(_controller!),
-          )
-        : const CircularProgressIndicator();
+    return ClipRect(
+      child: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 1000),
+        switchInCurve: Curves.easeInOut,
+        switchOutCurve: Curves.easeInOut,
+        transitionBuilder: (child, animation) {
+          return FadeTransition(
+            opacity: animation,
+            child: child,
+          );
+        },
+        child: SizedBox.expand(
+          key: ValueKey(_currentLinkIndex),
+          child: child,
+        ),
+      ),
+    );
   }
 
   void _handleMediaImageError(MediaLink media, Object error) {
