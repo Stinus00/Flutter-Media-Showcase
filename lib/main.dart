@@ -40,9 +40,6 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
   List<FrameLink> _frameLinks = [];
   List<TickerLink> _tickerLinks = [];
 
-  // Testing
-  bool _initialPlaylistActive = true;
-
   // Media Paths
   String? _imagePath;
   String? _framePath;
@@ -68,9 +65,11 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
   int _currentLinkIndexFrame = 0;
   int? _videoErrorIndex;
   FrameLink? _frameErrorPending;
+
   // Check API timers
   Timer? _scheduleCheckTimer;
   Timer? _payloadCheckTimer;
+  Timer? _tickerCheckTimer;
   StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
   bool? _hasNetworkConnection;
   int _connectivityRevision = 0;
@@ -236,6 +235,12 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
         });
       }
     });
+    _tickerCheckTimer ??= Timer.periodic(const Duration(minutes: 10), (_) async {
+      final updatedTickerLinks = await _apiCall
+          .rebuildTickersForCurrentSchedules();
+      
+      _tickerLinks = updatedTickerLinks;
+    });
   }
 
   // Check if there's any changes in api or schedules
@@ -248,7 +253,7 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
     }
     _isCheckingForChanges = true;
     try {
-      final payloadChanged = checkPayload
+      final payloadChanged = checkPayload == true
           ? await _apiCall.hasPayloadChanged()
           : false;
       final schedulesChanged = _apiCall.haveSchedulesChanged();
