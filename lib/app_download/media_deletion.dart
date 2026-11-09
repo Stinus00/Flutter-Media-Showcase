@@ -1,6 +1,6 @@
 import 'dart:io';
 
-import 'package:flutter_video_test/media_downloader.dart';
+import 'package:flutter_video_test/app_download/media_downloader.dart';
 
 class MediaDeletion {
   MediaDeletion({MediaDownloader? mediaDownloader})

@@ -1,5 +1,5 @@
-import 'package:flutter_video_test/media_cacher_stub.dart'
-    if (dart.library.js_interop) 'package:flutter_video_test/media_cacher.dart';
+import 'package:flutter_video_test/cache_download/media_cacher_stub.dart'
+    if (dart.library.js_interop) 'package:flutter_video_test/cache_download/media_cacher.dart';
 
 class MediaCacheDeletion {
   MediaCacheDeletion({MediaCacher? mediaCacher})
@@ -19,10 +19,6 @@ class MediaCacheDeletion {
 
   Future<void> _deleteStoreEntries(String store, Set<String> apiIds) async {
     final cachedIds = await _mediaCacher.getMediaKeysWeb(store);
-    print('Checking for Deletion ---- $store');
-    print('AllIds: $cachedIds');
-    print('apiIds: $apiIds');
-    print('-=-=-=-=-=--=-');
     for (final id in cachedIds.difference(apiIds)) {
       print('Deleting $id');
       print('-----=====-----');

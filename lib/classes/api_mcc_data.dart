@@ -1,5 +1,15 @@
 import 'dart:convert';
 
+int _parseAmount(Object? value) {
+  if (value is int) {
+    return value;
+  }
+  if (value is String) {
+    return int.tryParse(value) ?? 0;
+  }
+  return 0;
+}
+
 class SystemData {
   final String appId;
   final String name;
@@ -50,22 +60,13 @@ class Group {
   final String id;
   final String name;
 
-  Group({
-    required this.id,
-    required this.name,
-  });
+  Group({required this.id, required this.name});
 
   factory Group.fromJson(Map<String, dynamic> json) {
-    return Group(
-      id: json['id'] ?? '',
-      name: json['name'] ?? '',
-    );
+    return Group(id: json['id'] ?? '', name: json['name'] ?? '');
   }
 
-  Map<String, dynamic> toJson() => {
-        'id': id,
-        'name': name,
-      };
+  Map<String, dynamic> toJson() => {'id': id, 'name': name};
 }
 
 class GroupSchedules {
@@ -88,10 +89,10 @@ class GroupSchedules {
   }
 
   Map<String, dynamic> toJson() => {
-        'slides': slides,
-        'frames': frames,
-        'tickers': tickers,
-      };
+    'slides': slides,
+    'frames': frames,
+    'tickers': tickers,
+  };
 }
 
 class SystemSchedules {
@@ -116,10 +117,10 @@ class SystemSchedules {
   }
 
   Map<String, dynamic> toJson() => {
-        'slides': slides.map((e) => e.toJson()).toList(),
-        'frames': frames,
-        'tickers': tickers,
-      };
+    'slides': slides.map((e) => e.toJson()).toList(),
+    'frames': frames,
+    'tickers': tickers,
+  };
 }
 
 class ScheduleItem {
@@ -169,38 +170,32 @@ class ScheduleItem {
           json['slide_override_system_advertising'] ?? 0,
       slideAdvertisingDisplayDuration:
           json['slide_advertising_display_duration'] ?? 0,
-      slideAdvertisingInterval:
-          json['slide_advertising_interval'] ?? 0,
+      slideAdvertisingInterval: json['slide_advertising_interval'] ?? 0,
     );
   }
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'start': start,
-        'end': end,
-        'start_timezone': startTimezone,
-        'end_timezone': endTimezone,
-        'recurrence_id': recurrenceId,
-        'recurrence_rule': recurrenceRule,
-        'recurrence_exception': recurrenceException,
-        'playlist': playlist.toJson(),
-        'slide_shuffle': slideShuffle,
-        'slide_override_system_advertising':
-            slideOverrideSystemAdvertising,
-        'slide_advertising_display_duration':
-            slideAdvertisingDisplayDuration,
-        'slide_advertising_interval': slideAdvertisingInterval,
-      };
+    'id': id,
+    'start': start,
+    'end': end,
+    'start_timezone': startTimezone,
+    'end_timezone': endTimezone,
+    'recurrence_id': recurrenceId,
+    'recurrence_rule': recurrenceRule,
+    'recurrence_exception': recurrenceException,
+    'playlist': playlist.toJson(),
+    'slide_shuffle': slideShuffle,
+    'slide_override_system_advertising': slideOverrideSystemAdvertising,
+    'slide_advertising_display_duration': slideAdvertisingDisplayDuration,
+    'slide_advertising_interval': slideAdvertisingInterval,
+  };
 }
 
 class PlaylistReference {
   final String id;
   final String type;
 
-  PlaylistReference({
-    required this.id,
-    required this.type,
-  });
+  PlaylistReference({required this.id, required this.type});
 
   factory PlaylistReference.fromJson(Map<String, dynamic> json) {
     return PlaylistReference(
@@ -209,10 +204,7 @@ class PlaylistReference {
     );
   }
 
-  Map<String, dynamic> toJson() => {
-        'id': id,
-        'type': type,
-      };
+  Map<String, dynamic> toJson() => {'id': id, 'type': type};
 }
 
 class Playlists {
@@ -239,10 +231,10 @@ class Playlists {
   }
 
   Map<String, dynamic> toJson() => {
-        'slides': slides.map((e) => e.toJson()).toList(),
-        'frames': frames,
-        'tickers': tickers.map((e) => e.toJson()).toList(),
-      };
+    'slides': slides.map((e) => e.toJson()).toList(),
+    'frames': frames,
+    'tickers': tickers.map((e) => e.toJson()).toList(),
+  };
 }
 
 class SlidePlaylist {
@@ -270,11 +262,11 @@ class SlidePlaylist {
   }
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'status': status,
-        'groups': groups,
-        'slides': slides.map((e) => e.toJson()).toList(),
-      };
+    'id': id,
+    'status': status,
+    'groups': groups,
+    'slides': slides.map((e) => e.toJson()).toList(),
+  };
 }
 
 class SlideItem {
@@ -309,13 +301,9 @@ class SlideItem {
       id: json['id']?.toString() ?? '',
       mediaType: json['media_type'] ?? '',
       imageId: json['image_id']?.toString(),
-      image: json['image'] != null
-          ? MediaImage.fromJson(json['image'])
-          : null,
+      image: json['image'] != null ? MediaImage.fromJson(json['image']) : null,
       videoId: json['video_id']?.toString(),
-      video: json['video'] != null
-          ? MediaVideo.fromJson(json['video'])
-          : null,
+      video: json['video'] != null ? MediaVideo.fromJson(json['video']) : null,
       isUploading: json['is_uploading'] ?? false,
       datetimeStart: json['datetime_start'],
       datetimeEnd: json['datetime_end'],
@@ -325,18 +313,18 @@ class SlideItem {
   }
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'media_type': mediaType,
-        'image_id': imageId,
-        'image': image?.toJson(),
-        'video_id': videoId,
-        'video': video?.toJson(),
-        'is_uploading': isUploading,
-        'datetime_start': datetimeStart,
-        'datetime_end': datetimeEnd,
-        'delete_after_end': deleteAfterEnd,
-        'ad_duration': adDuration,
-      };
+    'id': id,
+    'media_type': mediaType,
+    'image_id': imageId,
+    'image': image?.toJson(),
+    'video_id': videoId,
+    'video': video?.toJson(),
+    'is_uploading': isUploading,
+    'datetime_start': datetimeStart,
+    'datetime_end': datetimeEnd,
+    'delete_after_end': deleteAfterEnd,
+    'ad_duration': adDuration,
+  };
 }
 
 class MediaImage {
@@ -344,11 +332,7 @@ class MediaImage {
   final String url;
   final String mimeType;
 
-  MediaImage({
-    required this.id,
-    required this.url,
-    required this.mimeType,
-  });
+  MediaImage({required this.id, required this.url, required this.mimeType});
 
   factory MediaImage.fromJson(Map<String, dynamic> json) {
     return MediaImage(
@@ -359,10 +343,10 @@ class MediaImage {
   }
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'url': url,
-        'mime_type': mimeType,
-      };
+    'id': id,
+    'url': url,
+    'mime_type': mimeType,
+  };
 }
 
 class MediaVideo {
@@ -370,11 +354,7 @@ class MediaVideo {
   final String url;
   final String mimeType;
 
-  MediaVideo({
-    required this.id,
-    required this.url,
-    required this.mimeType,
-  });
+  MediaVideo({required this.id, required this.url, required this.mimeType});
 
   factory MediaVideo.fromJson(Map<String, dynamic> json) {
     return MediaVideo(
@@ -385,20 +365,17 @@ class MediaVideo {
   }
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'url': url,
-        'mime_type': mimeType,
-      };
+    'id': id,
+    'url': url,
+    'mime_type': mimeType,
+  };
 }
 
 class PlaylistInfo {
   final String id;
   final String name;
 
-  PlaylistInfo({
-    required this.id,
-    required this.name,
-  });
+  PlaylistInfo({required this.id, required this.name});
 
   factory PlaylistInfo.fromJson(Map<String, dynamic> json) {
     return PlaylistInfo(
@@ -407,73 +384,49 @@ class PlaylistInfo {
     );
   }
 
-  Map<String, dynamic> toJson() => {
-        'id': id,
-        'name': name,
-      };
+  Map<String, dynamic> toJson() => {'id': id, 'name': name};
 }
 
 class TickerPlaylist {
   final String id;
   final String type;
-  final String title;
-  final String owner;
-  final String? description;
-  final String? imagePath;
   final String status;
   final List<dynamic> groups;
   final List<Ticker> tickers;
-  final int itemCount;
 
   TickerPlaylist({
     required this.id,
     required this.type,
-    required this.title,
-    required this.owner,
-    required this.description,
-    required this.imagePath,
     required this.status,
     required this.groups,
     required this.tickers,
-    required this.itemCount,
   });
 
   factory TickerPlaylist.fromJson(Map<String, dynamic> json) {
     return TickerPlaylist(
       id: json['id']?.toString() ?? '',
       type: json['type'] ?? '',
-      title: json['title'] ?? '',
-      owner: json['owner'] ?? '',
-      description: json['description'],
-      imagePath: json['image_path'],
       status: json['status'] ?? '',
       groups: json['groups'] as List? ?? [],
       tickers: (json['tickers'] as List? ?? [])
           .map((e) => Ticker.fromJson(e))
           .toList(),
-      itemCount: json['item_count'] ?? 0,
     );
   }
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'type': type,
-        'title': title,
-        'owner': owner,
-        'description': description,
-        'image_path': imagePath,
-        'status': status,
-        'groups': groups,
-        'tickers': tickers.map((e) => e.toJson()).toList(),
-        'item_count': itemCount,
-      };
+    'id': id,
+    'type': type,
+    'status': status,
+    'groups': groups,
+    'tickers': tickers.map((e) => e.toJson()).toList(),
+  };
 }
 
 class Ticker {
   final String id;
   final String type;
   final int tickerType;
-  final String name;
   final int amount;
   final String url;
 
@@ -481,7 +434,6 @@ class Ticker {
     required this.id,
     required this.type,
     required this.tickerType,
-    required this.name,
     required this.amount,
     required this.url,
   });
@@ -491,20 +443,18 @@ class Ticker {
       id: json['id']?.toString() ?? '',
       type: json['type'] ?? '',
       tickerType: json['ticker_type'] ?? 0,
-      name: json['name'] ?? '',
-      amount: json['amount'] ?? 0,
+      amount: _parseAmount(json['amount']),
       url: json['url'] ?? '',
     );
   }
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'type': type,
-        'ticker_type': tickerType,
-        'name': name,
-        'amount': amount,
-        'url': url,
-      };
+    'id': id,
+    'type': type,
+    'ticker_type': tickerType,
+    'amount': amount,
+    'url': url,
+  };
 }
 
 class FrameItem {
@@ -530,9 +480,7 @@ class FrameItem {
     return FrameItem(
       id: json['id']?.toString() ?? '',
       type: json['type']?.toString() ?? '',
-      image: json['image'] != null
-          ? MediaImage.fromJson(json['image'])
-          : null,
+      image: json['image'] != null ? MediaImage.fromJson(json['image']) : null,
       properties: json['properties'] != null
           ? FrameProperties.fromJson(json['properties'])
           : null,
@@ -543,33 +491,27 @@ class FrameItem {
   }
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'image': image?.toJson(),
-        'properties': properties?.toJson(),
-        'datetime_start': datetimeStart,
-        'datetime_end': datetimeEnd,
-        'delete_after_end': deleteAfterEnd,
-      };
+    'id': id,
+    'image': image?.toJson(),
+    'properties': properties?.toJson(),
+    'datetime_start': datetimeStart,
+    'datetime_end': datetimeEnd,
+    'delete_after_end': deleteAfterEnd,
+  };
 }
 
 class FrameProperties {
   final Cutout? cutout;
 
-  FrameProperties({
-    required this.cutout,
-  });
+  FrameProperties({required this.cutout});
 
   factory FrameProperties.fromJson(Map<String, dynamic> json) {
     return FrameProperties(
-      cutout: json['cutout'] != null
-          ? Cutout.fromJson(json['cutout'])
-          : null,
+      cutout: json['cutout'] != null ? Cutout.fromJson(json['cutout']) : null,
     );
   }
 
-  Map<String, dynamic> toJson() => {
-        'cutout': cutout?.toJson(),
-      };
+  Map<String, dynamic> toJson() => {'cutout': cutout?.toJson()};
 }
 
 class Cutout {
@@ -594,12 +536,7 @@ class Cutout {
     );
   }
 
-  Map<String, dynamic> toJson() => {
-        'x1': x1,
-        'y1': y1,
-        'x2': x2,
-        'y2': y2,
-      };
+  Map<String, dynamic> toJson() => {'x1': x1, 'y1': y1, 'x2': x2, 'y2': y2};
 }
 
 class TickerItem {
@@ -609,7 +546,7 @@ class TickerItem {
   final String name;
   final String? description;
   final int? tickerType;
-  final int? amount;
+  final int amount;
   final String? url;
 
   TickerItem({
@@ -631,19 +568,19 @@ class TickerItem {
       name: json['name'] ?? '',
       description: json['description'],
       tickerType: json['ticker_type'],
-      amount: json['amount'],
+      amount: _parseAmount(json['amount']),
       url: json['url'],
     );
   }
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'region_id': regionId,
-        'type': type,
-        'name': name,
-        'description': description,
-        'ticker_type': tickerType,
-        'amount': amount,
-        'url': url,
-      };
+    'id': id,
+    'region_id': regionId,
+    'type': type,
+    'name': name,
+    'description': description,
+    'ticker_type': tickerType,
+    'amount': amount,
+    'url': url,
+  };
 }

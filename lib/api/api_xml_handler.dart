@@ -1,21 +1,23 @@
-
 import 'package:dio/dio.dart';
+import 'package:http/http.dart' as http;
 import 'package:xml/xml.dart';
 
 class ApiXmlHandler {
-  ApiXmlHandler({Dio? dio})
-    : _dio = dio ?? Dio();
+  ApiXmlHandler({Dio? dio}) : _dio = dio ?? Dio();
   final Dio _dio;
 
+  // FRAMES
   // Get coordinates from XML file
   Future<(int, int, int, int)> getCoordinates(String xmlString) async {
     final document = XmlDocument.parse(xmlString);
 
-    final blockPos = document.findAllElements('VB_BlockPosition')
-      .map((element) => element.innerText);
-    final blockSize = document.findAllElements('VB_BlockSize')
-      .map((element) => element.innerText);
-    
+    final blockPos = document
+        .findAllElements('VB_BlockPosition')
+        .map((element) => element.innerText);
+    final blockSize = document
+        .findAllElements('VB_BlockSize')
+        .map((element) => element.innerText);
+
     final posList = blockPos.first.split(';');
     final sizeList = blockSize.first.split(';');
 
@@ -28,7 +30,7 @@ class ApiXmlHandler {
   }
 
   // Convert media given to xml string
-  Future<String?> convertLinkToXMLString(String link) async{
+  Future<String?> convertLinkToXMLString(String link) async {
     int index = link.lastIndexOf('.');
     String result = '${link.substring(0, index + 1)}xml';
 
@@ -54,10 +56,14 @@ class ApiXmlHandler {
     final x2 = _extractQueryParam(url, 'X2');
     final y2 = _extractQueryParam(url, 'Y2');
 
-    return x1 != null && x1.isNotEmpty 
-        && y1 != null && y1.isNotEmpty
-        && x2 != null && x2.isNotEmpty
-        && y2 != null && y2.isNotEmpty;
+    return x1 != null &&
+        x1.isNotEmpty &&
+        y1 != null &&
+        y1.isNotEmpty &&
+        x2 != null &&
+        x2.isNotEmpty &&
+        y2 != null &&
+        y2.isNotEmpty;
   }
 
   // Get all params and send back
@@ -89,5 +95,45 @@ class ApiXmlHandler {
     } catch (e) {
       return null;
     }
+  }
+
+  // TICKERS
+  Future<List<String>> getTickerStringFromXML(String xmlString, int amount) async{
+    xmlString = xmlString.replaceAll('|10|1', '');
+    List<String> tickerStrings = [];
+    int limit = amount;
+    int count = 0;
+
+    try {
+      final response = await _dio.get<String>(
+        xmlString,
+        options: Options(responseType: ResponseType.plain),
+      );
+
+      final xmlContent = response.data!;
+
+      final document = XmlDocument.parse(xmlContent);
+
+      print('test');
+      final items = document
+          .findAllElements('item');
+          // .map((element) => element);
+      
+      for (var item in items) {
+        if (count >= limit) {
+          break;
+        }
+        count++;
+        
+        final title = item.findElements('title').single.innerText;
+
+        print('$count: Title: $title');
+        tickerStrings.add(title);
+      }
+      return tickerStrings;
+    } catch (e) {
+      print('Error fetching or parsing XML tickers: $e');
+    }
+    return [];
   }
 }

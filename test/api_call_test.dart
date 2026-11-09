@@ -2,8 +2,9 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:flutter_video_test/api_call.dart';
-import 'package:flutter_video_test/media_downloader.dart';
+import 'package:flutter_video_test/api/api_call.dart';
+import 'package:flutter_video_test/api/api_xml_handler.dart';
+import 'package:flutter_video_test/app_download/media_downloader.dart';
 
 class _TestMediaDownloader extends MediaDownloader {
   _TestMediaDownloader(this.directory);
@@ -12,6 +13,11 @@ class _TestMediaDownloader extends MediaDownloader {
 
   @override
   Future<Directory> get downloadDirectory async => directory;
+}
+
+class _TestApiXmlHandler extends ApiXmlHandler {
+  @override
+  Future<String?> convertLinkToXMLString(String link) async => null;
 }
 
 const scheduleResponseJson = '''
@@ -103,6 +109,19 @@ Map<String, dynamic> decodeScheduleResponse() =>
     jsonDecode(scheduleResponseJson) as Map<String, dynamic>;
 
 void main() {
+  test('converts normalized ticker playlist entries to ticker links', () async {
+    final apiCall = ApiCall(apiXmlHandler: _TestApiXmlHandler());
+
+    final tickerLinks = await apiCall.convertTickersToTickerLinks([
+      {'id': 'ticker-1', 'url': 'https://example.com/ticker.txt'},
+    ]);
+
+    expect(tickerLinks, hasLength(1));
+    expect(tickerLinks.single.id, 'ticker-1');
+    expect(tickerLinks.single.link, 'https://example.com/ticker.txt');
+    expect(tickerLinks.single.type, 'ticker');
+  });
+
   group('getActiveGroupSchedules', () {
     final apiCall = ApiCall();
 

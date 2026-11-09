@@ -2,11 +2,11 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:flutter_video_test/api_call.dart';
-import 'package:flutter_video_test/media_cache_deletion.dart';
-import 'package:flutter_video_test/media_cacher_stub.dart';
-import 'package:flutter_video_test/media_deletion.dart';
-import 'package:flutter_video_test/media_downloader.dart';
+import 'package:flutter_video_test/api/api_call.dart';
+import 'package:flutter_video_test/cache_download/media_cache_deletion.dart';
+import 'package:flutter_video_test/cache_download/media_cacher_stub.dart';
+import 'package:flutter_video_test/app_download/media_deletion.dart';
+import 'package:flutter_video_test/app_download/media_downloader.dart';
 
 class _TestMediaDownloader extends MediaDownloader {
   _TestMediaDownloader(this.directory);
