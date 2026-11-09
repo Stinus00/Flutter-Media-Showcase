@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter/material.dart';
 
 class CustomTicker extends StatefulWidget {
@@ -38,6 +39,7 @@ class _CustomTickerState extends State<CustomTicker>
   double? _animationDistance;
   double? _animationSpeed;
   bool? _animationDirection;
+  late List<String> oldTextList;
 
   // Join all tickers together with symbol
   String get _tickerText => widget.textList
@@ -64,10 +66,23 @@ class _CustomTickerState extends State<CustomTicker>
   @override
   void initState() {
     super.initState();
+    oldTextList = List<String>.of(widget.textList);
     _controller = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 1),
     );
+  }
+
+  @override
+  void didUpdateWidget(covariant CustomTicker oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!listEquals(oldTextList, widget.textList)) {
+      oldTextList = List<String>.of(widget.textList);
+      _controller
+        ..stop()
+        ..value = 0;
+      _animationDistance = null;
+    }
   }
 
   @override

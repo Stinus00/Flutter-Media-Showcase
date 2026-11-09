@@ -1,10 +1,12 @@
 import 'package:dio/dio.dart';
+import 'package:http/http.dart' as http;
 import 'package:xml/xml.dart';
 
 class ApiXmlHandler {
   ApiXmlHandler({Dio? dio}) : _dio = dio ?? Dio();
   final Dio _dio;
 
+  // FRAMES
   // Get coordinates from XML file
   Future<(int, int, int, int)> getCoordinates(String xmlString) async {
     final document = XmlDocument.parse(xmlString);
@@ -93,5 +95,45 @@ class ApiXmlHandler {
     } catch (e) {
       return null;
     }
+  }
+
+  // TICKERS
+  Future<List<String>> getTickerStringFromXML(String xmlString, int amount) async{
+    xmlString = xmlString.replaceAll('|10|1', '');
+    List<String> tickerStrings = [];
+    int limit = amount;
+    int count = 0;
+
+    try {
+      final response = await _dio.get<String>(
+        xmlString,
+        options: Options(responseType: ResponseType.plain),
+      );
+
+      final xmlContent = response.data!;
+
+      final document = XmlDocument.parse(xmlContent);
+
+      print('test');
+      final items = document
+          .findAllElements('item');
+          // .map((element) => element);
+      
+      for (var item in items) {
+        if (count >= limit) {
+          break;
+        }
+        count++;
+        
+        final title = item.findElements('title').single.innerText;
+
+        print('$count: Title: $title');
+        tickerStrings.add(title);
+      }
+      return tickerStrings;
+    } catch (e) {
+      print('Error fetching or parsing XML tickers: $e');
+    }
+    return [];
   }
 }

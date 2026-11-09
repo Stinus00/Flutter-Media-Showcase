@@ -5,7 +5,6 @@ import 'package:flutter/foundation.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_video_test/classes/api_mcc_data.dart';
-import 'package:flutter_video_test/classes/errors.dart';
 import 'package:flutter_video_test/cache_download/media_cache_deletion.dart';
 import 'package:flutter_video_test/api/api_xml_handler.dart';
 import 'package:flutter_video_test/classes/frame_link.dart';
@@ -14,6 +13,7 @@ import 'package:flutter_video_test/cache_download/media_cacher_stub.dart'
 import 'package:flutter_video_test/app_download/media_deletion.dart';
 import 'package:flutter_video_test/app_download/media_downloader.dart';
 import 'package:flutter_video_test/classes/media_link.dart';
+import 'package:flutter_video_test/classes/ticker_link.dart';
 import 'package:intl/intl.dart';
 import 'package:teno_rrule/teno_rrule.dart';
 
@@ -51,6 +51,7 @@ class ApiCall {
 
   final _playlistsMapMedia = {};
   final _playlistsMapFrames = {};
+  final _playlistsMapTickers = {};
 
   // Get data from URL
   Future<List<MediaLink>> getMediaFromApi() async {
@@ -75,29 +76,6 @@ class ApiCall {
     }
   }
 
-  // Cleans up all media available which isn't used anymore.
-  Future<void> cleanupStoredMedia() async {
-    final responseJson = _currentResponseJson;
-    if (responseJson == null) {
-      throw StateError('Media must be loaded before cleaning stored media.');
-    }
-
-    final ids = getApiMediaIdsFromResponse(responseJson);
-    if (kIsWeb) {
-      await _mediaCacheDeletion.deleteMediaNotInApi(
-        imageIds: ids.images,
-        videoIds: ids.videos,
-        frameIds: ids.frames,
-      );
-    } else {
-      await _mediaDeletion.deleteMediaNotInApi(
-        imageIds: ids.images,
-        videoIds: ids.videos,
-        frameIds: ids.frames,
-      );
-    }
-  }
-
   Future<List<FrameLink>> getFrameLinksFromApi() async {
     try {
       final responseJson = _currentResponseJson;
@@ -109,6 +87,21 @@ class ApiCall {
       return await _buildFramesFromResponse(jsonString, now: DateTime.now());
     } catch (e) {
       debugPrint('Error fetching frames from API: $e');
+      rethrow;
+    }
+  }
+
+  Future<List<TickerLink>> getTickerLinksFromApi() async {
+    try {
+      final responseJson = _currentResponseJson;
+      final data = responseJson == null
+          ? await _getJsonFromUrl()
+          : jsonDecode(responseJson) as Map<String, dynamic>;
+      final jsonString = await _shortenJsonData(data);
+
+      return await _buildTickersFromResponse(jsonString, now: DateTime.now());
+    } catch (e) {
+      debugPrint('Error fetching tickers from API: $e');
       rethrow;
     }
   }
@@ -181,6 +174,16 @@ class ApiCall {
       throw StateError('Media must be loaded before rebuilding the playlist.');
     }
     return _buildFramesFromResponse(responseJson, now: now ?? DateTime.now());
+  }
+
+  Future<List<TickerLink>> rebuildTickersForCurrentSchedules({
+    DateTime? now,
+  }) async {
+    final responseJson = _pendingResponseJson ?? _currentResponseJson;
+    if (responseJson == null) {
+      throw StateError('Media must be loaded before rebuilding the playlist.');
+    }
+    return _buildTickersFromResponse(responseJson, now: now ?? DateTime.now());
   }
 
   // Build media list from response
@@ -351,11 +354,42 @@ class ApiCall {
 
     final frameLinks = await _convertFramesToFrameLinks(mainList);
     final downloadedFramesLinks = await _downloadFrames(frameLinks);
-    await _saveApiResponse(jsonString);
     _currentResponseJson = jsonString;
     _pendingResponseJson = null;
     _lastActiveScheduleFrameIds = _scheduleIds(groupSchedules, systemSchedules);
     return downloadedFramesLinks;
+  }
+
+  Future<List<TickerLink>> _buildTickersFromResponse(
+    String jsonString, {
+    required DateTime now,
+  }) async {
+    final tickers = <dynamic>[];
+    final mainList = <dynamic>[];
+    final mapJson = jsonDecode(jsonString) as Map<String, dynamic>;
+    final playlists = mapJson['playlists']['tickers'];
+    _playlistsMapTickers.clear();
+    _mapTickerPlaylists(playlists);
+
+    final groupSchedules = _getGroupSchedules(
+      tickers,
+      mapJson,
+      'tickers',
+      now: now,
+    );
+    final systemSchedules = _getSystemSchedules(
+      tickers,
+      mapJson,
+      'tickers',
+      now: now,
+    );
+
+    _getPlaylistData(tickers, List.empty(), mainList, 'tickers');
+
+    final tickerLinks = await convertTickersToTickerLinks(mainList);
+    _currentResponseJson = jsonString;
+    _pendingResponseJson = null;
+    return tickerLinks;
   }
 
   // Get JSON from api
@@ -559,6 +593,14 @@ class ApiCall {
     }
   }
 
+  Future<void> _mapTickerPlaylists(List<dynamic> playlists) async {
+    for (var playlist in playlists) {
+      if (_playlistsMapTickers[playlist['id']] != null) continue;
+
+      _playlistsMapTickers[playlist['id']] = playlist;
+    }
+  }
+
   // For each schedule get playlist associated with it.
   Future<void> _getPlaylistData(
     List<dynamic> schedules,
@@ -577,6 +619,9 @@ class ApiCall {
           break;
         case 'frames':
           playlist = _playlistsMapFrames[playlistId];
+          break;
+        case 'tickers':
+          playlist = _playlistsMapTickers[playlistId];
           break;
       }
       var slidesList = playlist[type];
@@ -704,6 +749,36 @@ class ApiCall {
     return frameLinks;
   }
 
+  @visibleForTesting
+  Future<List<TickerLink>> convertTickersToTickerLinks(
+    List<dynamic> tickers,
+  ) async {
+    List<TickerLink> tickerLinks = [];
+    for (var item in tickers) {
+      final type = 'ticker';
+      final url = item['url'] as String;
+      final id = item['id'] as String?;
+      final amount = item['amount'] as int;
+      if (url.isEmpty) {
+        continue;
+      }
+      List<String> tickerStrings = await _apiXmlHandler.getTickerStringFromXML(url, amount);
+      if(tickerStrings.isEmpty) {
+        continue;
+      }
+      tickerLinks.add(
+        TickerLink(
+          link: url,
+          type: type,
+          id: id,
+          tickerStrings: tickerStrings,
+        ),
+      );
+    }
+
+    return tickerLinks;
+  }
+
   // return file extension (last part of link after .)
   String _getFileExtension(String url) {
     return url.split('.').last;
@@ -726,6 +801,29 @@ class ApiCall {
     } else {
       return List<FrameLink>.from(
         await _downloader.downloadAllMedia(links: frames),
+      );
+    }
+  }
+
+  // Cleans up all media available which isn't used anymore.
+  Future<void> cleanupStoredMedia() async {
+    final responseJson = _currentResponseJson;
+    if (responseJson == null) {
+      throw StateError('Media must be loaded before cleaning stored media.');
+    }
+
+    final ids = getApiMediaIdsFromResponse(responseJson);
+    if (kIsWeb) {
+      await _mediaCacheDeletion.deleteMediaNotInApi(
+        imageIds: ids.images,
+        videoIds: ids.videos,
+        frameIds: ids.frames,
+      );
+    } else {
+      await _mediaDeletion.deleteMediaNotInApi(
+        imageIds: ids.images,
+        videoIds: ids.videos,
+        frameIds: ids.frames,
       );
     }
   }

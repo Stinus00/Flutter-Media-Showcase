@@ -390,56 +390,36 @@ class PlaylistInfo {
 class TickerPlaylist {
   final String id;
   final String type;
-  final String title;
-  final String owner;
-  final String? description;
-  final String? imagePath;
   final String status;
   final List<dynamic> groups;
   final List<Ticker> tickers;
-  final int itemCount;
 
   TickerPlaylist({
     required this.id,
     required this.type,
-    required this.title,
-    required this.owner,
-    required this.description,
-    required this.imagePath,
     required this.status,
     required this.groups,
     required this.tickers,
-    required this.itemCount,
   });
 
   factory TickerPlaylist.fromJson(Map<String, dynamic> json) {
     return TickerPlaylist(
       id: json['id']?.toString() ?? '',
       type: json['type'] ?? '',
-      title: json['title'] ?? '',
-      owner: json['owner'] ?? '',
-      description: json['description'],
-      imagePath: json['image_path'],
       status: json['status'] ?? '',
       groups: json['groups'] as List? ?? [],
       tickers: (json['tickers'] as List? ?? [])
           .map((e) => Ticker.fromJson(e))
           .toList(),
-      itemCount: json['item_count'] ?? 0,
     );
   }
 
   Map<String, dynamic> toJson() => {
     'id': id,
     'type': type,
-    'title': title,
-    'owner': owner,
-    'description': description,
-    'image_path': imagePath,
     'status': status,
     'groups': groups,
     'tickers': tickers.map((e) => e.toJson()).toList(),
-    'item_count': itemCount,
   };
 }
 
@@ -447,7 +427,6 @@ class Ticker {
   final String id;
   final String type;
   final int tickerType;
-  final String name;
   final int amount;
   final String url;
 
@@ -455,7 +434,6 @@ class Ticker {
     required this.id,
     required this.type,
     required this.tickerType,
-    required this.name,
     required this.amount,
     required this.url,
   });
@@ -465,7 +443,6 @@ class Ticker {
       id: json['id']?.toString() ?? '',
       type: json['type'] ?? '',
       tickerType: json['ticker_type'] ?? 0,
-      name: json['name'] ?? '',
       amount: _parseAmount(json['amount']),
       url: json['url'] ?? '',
     );
@@ -475,7 +452,6 @@ class Ticker {
     'id': id,
     'type': type,
     'ticker_type': tickerType,
-    'name': name,
     'amount': amount,
     'url': url,
   };

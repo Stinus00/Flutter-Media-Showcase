@@ -10,6 +10,7 @@ import 'package:flutter_video_test/classes/frame_link.dart';
 import 'package:flutter_video_test/cache_download/media_cacher_stub.dart'
     if (dart.library.js_interop) 'package:flutter_video_test/cache_download/media_cacher.dart';
 import 'package:flutter_video_test/app_download/media_downloader.dart';
+import 'package:flutter_video_test/classes/ticker_link.dart';
 import 'package:video_player/video_player.dart';
 import 'package:video_player_media_kit/video_player_media_kit.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
@@ -33,8 +34,11 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
   final MediaCacher _mediaCacher = MediaCacher();
   final ApiCall _apiCall = ApiCall();
   final MediaDownloader _mediaDownloader = MediaDownloader();
+
+  // Lists.
   List<MediaLink> _mediaLinks = [];
   List<FrameLink> _frameLinks = [];
+  List<TickerLink> _tickerLinks = [];
 
   // Testing
   bool _initialPlaylistActive = true;
@@ -60,7 +64,6 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
   bool _isChangingVideo = false;
   bool _isSkippingMedia = false;
   bool _isPreparingMedia = true;
-  bool _changingPlaylist = false;
   int _currentLinkIndex = 0;
   int _currentLinkIndexFrame = 0;
   int? _videoErrorIndex;
@@ -89,7 +92,7 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
   FrameLink? get _currentMediaFrame =>
       _frameLinks.isEmpty ? null : _frameLinks[_currentLinkIndexFrame];
 
-  String allTickers = '';
+  List<String> allTickers = [];
 
   @override
   void initState() {
@@ -153,26 +156,23 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
     );
   }
 
-  // Start Next Playlist
-  Future<void> _startNextPlaylist() async {
-    _currentLinkIndex = 0;
-    _prepareMedia();
-    _initialPlaylistActive = !_initialPlaylistActive;
-    _changingPlaylist = false;
-  }
-
   // Download the media given and initialize the first media.
   Future<void> _prepareMedia({bool startChangeChecks = false}) async {
     try {
       if (_mediaLinks.isEmpty) {
         _mediaLinks = await _apiCall.getMediaFromApi();
       }
-      final frameLinks = await _apiCall.getFrameLinksFromApi();
-      _frameLinks = kIsWeb == true
-          ? List.of(frameLinks)
-          : List<FrameLink>.from(
-              await _mediaDownloader.downloadAllMedia(links: frameLinks),
-            );
+      if (_frameLinks.isEmpty) {
+        _frameLinks = await _apiCall.getFrameLinksFromApi();
+      }
+      if(_tickerLinks.isEmpty) {
+        _tickerLinks = await _apiCall.getTickerLinksFromApi();
+      }
+
+      for(final ticker in _tickerLinks) {
+        allTickers += ticker.tickerStrings;
+      }
+
 
       _isPreparingMedia = false;
       if (mounted) setState(() {});
@@ -180,11 +180,6 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
       await _initializeFrame();
       if (startChangeChecks) {
         _startChangeChecks();
-      }
-
-      for (String ticker in tickers) {
-        allTickers += ' • ';
-        allTickers += ticker;
       }
     } catch (error) {
       if (!mounted) return;
@@ -266,6 +261,9 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
           .rebuildMediaForCurrentSchedules();
       final updatedFrameLinks = await _apiCall
           .rebuildFramesForCurrentSchedules();
+      final updatedTickerLinks = await _apiCall
+          .rebuildTickersForCurrentSchedules();
+    
       _isChangingVideo = true;
       _imageTimer?.cancel();
       _imageTimer = null;
@@ -284,6 +282,12 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
 
       _mediaLinks = updatedMediaLinks;
       _frameLinks = updatedFrameLinks;
+      _tickerLinks = updatedTickerLinks;
+
+      allTickers = [];
+      for(final ticker in _tickerLinks) {
+        allTickers += ticker.tickerStrings;
+      }
 
       await _initializeMedia();
       await _initializeFrame();
@@ -695,10 +699,6 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
     _isChangingVideo = false;
 
     await _checkPendingMediaChanges();
-    if (_changingPlaylist) {
-      unawaited(_startNextPlaylist());
-      return;
-    }
     if (!identical(_currentMedia, media)) return;
     setState(() {});
 
@@ -1026,8 +1026,9 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
     const borderColor = Colors.black;
     final borderWidth = fontSize * 0.1;
     final tickerSpeed = 1 * fontSize * 1;
+
     return CustomTicker(
-      tickers,
+      allTickers,
       tickerSpeed: tickerSpeed,
       tickerFontSize: fontSize,
       tickerSymbol: '•',
