@@ -950,7 +950,7 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
       }
     } else {
       // Return Video if its not an image
-      child = _controller?.value.isInitialized ?? false
+      return _controller?.value.isInitialized ?? false
           ? AspectRatio(
               aspectRatio: _controller!.value.aspectRatio,
               child: VideoPlayer(_controller!),
