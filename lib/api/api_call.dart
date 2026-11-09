@@ -756,7 +756,8 @@ class ApiCall {
     List<TickerLink> tickerLinks = [];
     for (var item in tickers) {
       final type = 'ticker';
-      final url = item['url'] as String;
+      var url = item['url'] as String;
+      url = url.replaceAll('http:', 'https:');
       final id = item['id'] as String?;
       final amount = item['amount'] as int;
       if (url.isEmpty) {

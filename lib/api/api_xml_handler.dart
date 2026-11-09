@@ -104,10 +104,17 @@ class ApiXmlHandler {
     int limit = amount;
     int count = 0;
 
+    String bcmString = 'https://rssrelay-strato.bcmserver.com/';
+
     try {
       final response = await _dio.get<String>(
-        xmlString,
-        options: Options(responseType: ResponseType.plain),
+        bcmString,
+        queryParameters: {
+          'url': xmlString
+        },
+        options: Options(
+          responseType: ResponseType.plain,
+        )
       );
 
       final xmlContent = response.data!;
@@ -131,8 +138,12 @@ class ApiXmlHandler {
         tickerStrings.add(title);
       }
       return tickerStrings;
-    } catch (e) {
+    } on DioException catch (e) {
       print('Error fetching or parsing XML tickers: $e');
+      print('Status: ${e.response?.statusCode}');
+      print('Response: ${e.response?.data}');
+      print('Headers: ${e.response?.headers}');
+      print('Request URL: ${e.requestOptions.uri}');
     }
     return [];
   }
