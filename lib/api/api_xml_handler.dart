@@ -1,5 +1,4 @@
 import 'package:dio/dio.dart';
-import 'package:http/http.dart' as http;
 import 'package:xml/xml.dart';
 
 class ApiXmlHandler {
@@ -99,19 +98,25 @@ class ApiXmlHandler {
 
   // TICKERS
   Future<List<String>> getTickerStringFromXML(String xmlString, int amount) async{
-    xmlString = xmlString.replaceAll('|10|1', '');
+    List<dynamic> strings = xmlString.split('|');
     List<String> tickerStrings = [];
     int limit = amount;
     int count = 0;
 
-    String bcmString = 'https://rssrelay-strato.bcmserver.com/';
+    xmlString = strings[0];
+    int type = 0;
+    if(strings[2] != null && strings[2].isNotEmpty)
+    {
+      type = int.parse(strings[2]);
+    }
+
+    // String bcmString = 'http://localhost:8000/?url=$xmlString';
+    // String bcmString = 'https://unquote-stencil-sandbag.ngrok-free.dev/?url=$xmlString';
+    String bcmString = 'https://rssrelay-strato.bcmserver.com/?url=$xmlString';
 
     try {
       final response = await _dio.get<String>(
         bcmString,
-        queryParameters: {
-          'url': xmlString
-        },
         options: Options(
           responseType: ResponseType.plain,
         )
@@ -132,19 +137,88 @@ class ApiXmlHandler {
         }
         count++;
         
-        final title = item.findElements('title').single.innerText;
+        switch (type) {
+          case 1:
+            final title = item.findElements('title').single.innerText.trim();
+
+            print('$count: Title: $title');
+            tickerStrings.add(title);
+            continue;
+          case 2:
+
+            continue;
+          case 3:
+            final title = item.findElements('title').single.innerText.trim();
+            String description = item.findElements('description').single.innerText.trim();
+
+            // Remove HTML from string
+            RegExp expHTML = RegExp(r'(<a[^>]*>.*<\/a[^>]*>)|(<[^>]*>)');
+            description = description.replaceAll(expHTML, ' ');
+
+            // Remove double spaces from string
+            RegExp expSpaces = RegExp(r'\ \ +');
+            description = description.replaceAll(expSpaces, ' ');
+
+            print('$count: Title: $title');
+            print('$count: Description: $description');
+
+            String tickerString = '$title - $description';
+            tickerStrings.add(tickerString);
+
+            continue;
+          default:
+            final title = item.findElements('title').single.innerText.trim();
+
+            print('$count: Title: $title');
+            tickerStrings.add(title);
+        }
+      }
+      return tickerStrings;
+    } on DioException catch (e) {
+      print('HTTP STATUS: ${e.response?.statusCode}');
+      print('RESPONSE: ${e.response?.data}');
+      print('HEADERS: ${e.response?.headers}');
+    } catch (e) {
+      print('Error fetching or parsing XML tickers: $e');
+    }
+    return [];
+  }
+
+  Future<void> checkTicker(String string) async {
+    List<String> tickerStrings = [];
+    int limit = 1;
+    int count = 0;
+
+    try {
+      final response = await _dio.get<String>(
+        string,
+        options: Options(
+          responseType: ResponseType.plain,
+        )
+      );
+
+      final xmlContent = response.data!;
+
+      final document = XmlDocument.parse(xmlContent);
+
+      print('test');
+      final items = document
+          .findAllElements('item');
+          // .map((element) => element);
+      
+      for (var item in items) {
+        if (count >= limit) {
+          break;
+        }
+        count++;
+        
+        final title = item.findElements('title').single.innerText.trim();
 
         print('$count: Title: $title');
         tickerStrings.add(title);
       }
-      return tickerStrings;
-    } on DioException catch (e) {
+    } catch (e) {
       print('Error fetching or parsing XML tickers: $e');
-      print('Status: ${e.response?.statusCode}');
-      print('Response: ${e.response?.data}');
-      print('Headers: ${e.response?.headers}');
-      print('Request URL: ${e.requestOptions.uri}');
     }
-    return [];
   }
 }

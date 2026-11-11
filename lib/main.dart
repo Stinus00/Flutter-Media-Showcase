@@ -5,21 +5,21 @@ import 'dart:math' as math;
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_video_test/classes/custom_ticker.dart';
-import 'package:flutter_video_test/classes/frame_link.dart';
-import 'package:flutter_video_test/cache_download/media_cacher_stub.dart'
-    if (dart.library.js_interop) 'package:flutter_video_test/cache_download/media_cacher.dart';
-import 'package:flutter_video_test/app_download/media_downloader.dart';
-import 'package:flutter_video_test/classes/ticker_link.dart';
 import 'package:video_player/video_player.dart';
 import 'package:video_player_media_kit/video_player_media_kit.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
-import 'sources/ticker_sources.dart';
 import 'classes/media_link.dart';
+import 'classes/frame_link.dart';
+import 'classes/ticker_link.dart';
+import 'classes/custom_ticker.dart';
+
 import 'api/api_call.dart';
+import 'app_download/media_downloader.dart';
 import 'cache_download/page_reloader_stub.dart'
     if (dart.library.js_interop) 'cache_download/page_reloader.dart';
+import 'cache_download/media_cacher_stub.dart'
+    if (dart.library.js_interop) 'cache_download/media_cacher.dart';
 
 void main() => runApp(const VideoApp());
 
@@ -39,6 +39,7 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
   List<MediaLink> _mediaLinks = [];
   List<FrameLink> _frameLinks = [];
   List<TickerLink> _tickerLinks = [];
+  List<String> allTickers = []; // String with all ticker titles
 
   // Media Paths
   String? _imagePath;
@@ -70,9 +71,7 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
   Timer? _scheduleCheckTimer;
   Timer? _payloadCheckTimer;
   Timer? _tickerCheckTimer;
-  StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
-  bool? _hasNetworkConnection;
-  int _connectivityRevision = 0;
+
   // Check API booleans
   bool _checkSchedule = false;
   bool _checkPayload = false;
@@ -86,12 +85,15 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
   double? y2;
   String? creationType;
 
+  // Check internet connection
+  StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
+  bool? _hasNetworkConnection;
+  int _connectivityRevision = 0;
+
   MediaLink? get _currentMedia =>
       _mediaLinks.isEmpty ? null : _mediaLinks[_currentLinkIndex];
   FrameLink? get _currentMediaFrame =>
       _frameLinks.isEmpty ? null : _frameLinks[_currentLinkIndexFrame];
-
-  List<String> allTickers = [];
 
   @override
   void initState() {
@@ -207,11 +209,12 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
   // Start timers
   // // 1 minute for checking if schedules changed
   // // 15 minutes for checking if api changed
+  // // 10 minutes for checking if ticker sources have changed media
   void _startChangeChecks() {
     _scheduleCheckTimer?.cancel();
     _payloadCheckTimer?.cancel();
 
-    _scheduleCheckTimer ??= Timer.periodic(const Duration(minutes: 1), (_) {
+    _scheduleCheckTimer ??= Timer.periodic(const Duration(minutes: 1), (_) { // Check if schedules have changed
       if (_mediaLinks.isEmpty) {
         setState(() {
           _preloadError = null;
@@ -223,7 +226,7 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
         });
       }
     });
-    _payloadCheckTimer ??= Timer.periodic(const Duration(minutes: 15), (_) {
+    _payloadCheckTimer ??= Timer.periodic(const Duration(minutes: 15), (_) { // Check if API callback has changed
       if (_mediaLinks.isEmpty) {
         setState(() {
           _preloadError = null;
@@ -235,7 +238,7 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
         });
       }
     });
-    _tickerCheckTimer ??= Timer.periodic(const Duration(minutes: 10), (_) async {
+    _tickerCheckTimer ??= Timer.periodic(const Duration(minutes: 10), (_) async { // Check if tickersources have changed
       final updatedTickerLinks = await _apiCall
           .rebuildTickersForCurrentSchedules();
       
@@ -253,15 +256,16 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
     }
     _isCheckingForChanges = true;
     try {
-      final payloadChanged = checkPayload == true
+      final payloadChanged = checkPayload == true // Check if callback has changed
           ? await _apiCall.hasPayloadChanged()
           : false;
-      final schedulesChanged = _apiCall.haveSchedulesChanged();
+      final schedulesChanged = _apiCall.haveSchedulesChanged(); // Check if changes in schedule
       if (!payloadChanged && !schedulesChanged) {
         await _apiCall.cleanupStoredMedia();
         return;
       }
 
+      // Rebuild all media
       final updatedMediaLinks = await _apiCall
           .rebuildMediaForCurrentSchedules();
       final updatedFrameLinks = await _apiCall
@@ -269,6 +273,7 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
       final updatedTickerLinks = await _apiCall
           .rebuildTickersForCurrentSchedules();
     
+      // Clear everything for future use
       _isChangingVideo = true;
       _imageTimer?.cancel();
       _imageTimer = null;

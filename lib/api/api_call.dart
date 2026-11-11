@@ -45,6 +45,7 @@ class ApiCall {
   String? _pendingResponseJson;
   Set<String>? _lastActiveScheduleIds;
   Set<String>? _lastActiveScheduleFrameIds;
+  Set<String>? _lastActiveScheduleTickerIds;
 
   // For Web
   String? oldJson;
@@ -134,7 +135,9 @@ class ApiCall {
     final responseJson = _pendingResponseJson ?? _currentResponseJson;
     if (responseJson == null ||
         _lastActiveScheduleIds == null ||
-        _lastActiveScheduleFrameIds == null) {
+        _lastActiveScheduleFrameIds == null ||
+        _lastActiveScheduleTickerIds == null
+        ) {
       return false;
       // throw StateError('Media must be loaded before checking schedules.');
     }
@@ -148,9 +151,15 @@ class ApiCall {
       data,
       now: now ?? DateTime.now(),
     );
+    final activeScheduleTickerIds = _getActiveScheduleTickerIds(
+      data,
+      now: now ?? DateTime.now(),
+    );
+
 
     return !setEquals(activeScheduleIds, _lastActiveScheduleIds) ||
-        !setEquals(activeScheduleFrameIds, _lastActiveScheduleFrameIds);
+        !setEquals(activeScheduleFrameIds, _lastActiveScheduleFrameIds) ||
+        !setEquals(activeScheduleTickerIds, _lastActiveScheduleTickerIds);
   }
 
   // Rebuild media if needed
@@ -389,6 +398,7 @@ class ApiCall {
     final tickerLinks = await convertTickersToTickerLinks(mainList);
     _currentResponseJson = jsonString;
     _pendingResponseJson = null;
+    _lastActiveScheduleTickerIds = _scheduleIds(groupSchedules, systemSchedules);
     return tickerLinks;
   }
 
@@ -511,6 +521,15 @@ class ApiCall {
   }) {
     final groupSchedules = _getActiveGroupSchedules(data, 'frames', now: now);
     final systemSchedules = _getActiveSystemSchedules(data, 'frames', now: now);
+    return _scheduleIds(groupSchedules, systemSchedules);
+  }
+
+  Set<String> _getActiveScheduleTickerIds(
+    Map<String, dynamic> data, {
+      required DateTime now,
+  }) {
+    final groupSchedules = _getActiveGroupSchedules(data, 'tickers', now: now);
+    final systemSchedules = _getActiveSystemSchedules(data, 'tickers', now: now);
     return _scheduleIds(groupSchedules, systemSchedules);
   }
 
@@ -757,7 +776,6 @@ class ApiCall {
     for (var item in tickers) {
       final type = 'ticker';
       var url = item['url'] as String;
-      url = url.replaceAll('http:', 'https:');
       final id = item['id'] as String?;
       final amount = item['amount'] as int;
       if (url.isEmpty) {
@@ -776,7 +794,6 @@ class ApiCall {
         ),
       );
     }
-
     return tickerLinks;
   }
 
