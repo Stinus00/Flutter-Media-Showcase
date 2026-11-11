@@ -105,7 +105,7 @@ class ApiXmlHandler {
 
     xmlString = strings[0];
     int type = 0;
-    if(strings[2] != null && strings[2].isNotEmpty)
+    if(strings.length > 1)
     {
       type = int.parse(strings[2]);
     }
