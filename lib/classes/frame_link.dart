@@ -1,3 +1,5 @@
+import 'package:flutter_video_test/classes/frame_ticker_position.dart';
+
 class FrameLink {
   const FrameLink({
     required this.link,
@@ -8,10 +10,13 @@ class FrameLink {
     this.mimeType,
     this.localPath,
     this.creationType,
+
     required this.x1,
     required this.y1,
     required this.x2,
     required this.y2,
+
+    this.frameTickerPositions,
   });
 
   final String? id;
@@ -27,4 +32,6 @@ class FrameLink {
   final double y1;
   final double x2;
   final double y2;
+
+  final List<FrameTickerPosition>? frameTickerPositions;
 }

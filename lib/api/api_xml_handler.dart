@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter_video_test/classes/frame_ticker_position.dart';
 import 'package:xml/xml.dart';
 
 class ApiXmlHandler {
@@ -28,6 +29,58 @@ class ApiXmlHandler {
     return (x1, y1, x2, y2);
   }
 
+  // Get Ticker coordinates from XML file
+  Future<List<FrameTickerPosition>> getTickerCoordinates(String xmlString, String frameId) async {
+    final document = XmlDocument.parse(xmlString);
+
+    final textBlocks = document
+        .findAllElements('TextBlock');
+    
+    List<FrameTickerPosition> tickerPositions = [];
+
+    for(var block in textBlocks) {
+      final indexString = block
+          .findAllElements('TB_Index')
+          .map((element) => element.innerText);
+
+      final blockPos = block
+          .findAllElements('TB_BlockPosition')
+          .map((element) => element.innerText);
+      final blockSize = block
+          .findAllElements('TB_BlockSize')
+          .map((element) => element.innerText);
+
+      final fontSizeString = block
+          .findAllElements('TB_FontSize')
+          .map((element) => element.innerText);
+      
+      final index = int.parse(indexString.first);
+
+      final posList = blockPos.first.split(';');
+      final sizeList = blockSize.first.split(';');
+      print('SIZE $sizeList');
+
+      final x1 = int.parse(posList[0]);
+      final y1 = int.parse(posList[1]);
+      final x2 = int.parse(sizeList[0]) + x1;
+      final y2 = int.parse(sizeList[1]) + y1;
+
+      final fontSize = int.parse(fontSizeString.first);
+
+      tickerPositions.add(
+        FrameTickerPosition(
+          index: index, 
+          frameId: frameId, 
+          x1: x1, 
+          y1: y1, 
+          x2: x2, 
+          y2: y2,
+          fontSize: fontSize,
+      ));
+    }
+    return tickerPositions;
+  }
+
   // Convert media given to xml string
   Future<String?> convertLinkToXMLString(String link) async {
     int index = link.lastIndexOf('.');
@@ -44,7 +97,7 @@ class ApiXmlHandler {
   }
 
   // Check if properties exist
-  bool checkPropertyExists(item) {
+  bool checkPropertyExists(dynamic item) {
     return item['properties'] != null;
   }
 
@@ -126,10 +179,8 @@ class ApiXmlHandler {
 
       final document = XmlDocument.parse(xmlContent);
 
-      print('test');
       final items = document
           .findAllElements('item');
-          // .map((element) => element);
       
       for (var item in items) {
         if (count >= limit) {
@@ -173,6 +224,7 @@ class ApiXmlHandler {
             tickerStrings.add(title);
         }
       }
+      print('-------------------------------------------');
       return tickerStrings;
     } on DioException catch (e) {
       print('HTTP STATUS: ${e.response?.statusCode}');
@@ -182,43 +234,5 @@ class ApiXmlHandler {
       print('Error fetching or parsing XML tickers: $e');
     }
     return [];
-  }
-
-  Future<void> checkTicker(String string) async {
-    List<String> tickerStrings = [];
-    int limit = 1;
-    int count = 0;
-
-    try {
-      final response = await _dio.get<String>(
-        string,
-        options: Options(
-          responseType: ResponseType.plain,
-        )
-      );
-
-      final xmlContent = response.data!;
-
-      final document = XmlDocument.parse(xmlContent);
-
-      print('test');
-      final items = document
-          .findAllElements('item');
-          // .map((element) => element);
-      
-      for (var item in items) {
-        if (count >= limit) {
-          break;
-        }
-        count++;
-        
-        final title = item.findElements('title').single.innerText.trim();
-
-        print('$count: Title: $title');
-        tickerStrings.add(title);
-      }
-    } catch (e) {
-      print('Error fetching or parsing XML tickers: $e');
-    }
   }
 }

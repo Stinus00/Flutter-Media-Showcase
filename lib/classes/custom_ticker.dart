@@ -42,9 +42,8 @@ class _CustomTickerState extends State<CustomTicker>
   late List<String> oldTextList;
 
   // Join all tickers together with symbol
-  String get _tickerText => widget.textList
-      .map((text) => '${widget.tickerSymbol} $text')
-      .join(' ');
+  String get _tickerText =>
+      widget.textList.map((text) => '${widget.tickerSymbol} $text').join(' ');
 
   // Regular text style for the ticker
   TextStyle get _textStyle => TextStyle(
@@ -135,7 +134,7 @@ class _CustomTickerState extends State<CustomTicker>
     final inheritedStyle = DefaultTextStyle.of(context).style;
     final style = inheritedStyle.merge(_textStyle);
     final borderStyle = inheritedStyle.merge(_borderTextStyle);
-    
+
     final textDirection = Directionality.of(context);
     // Measure the text so copies fit edge-to-edge and the viewport can fit its line box.
     final textPainter = TextPainter(
@@ -168,7 +167,7 @@ class _CustomTickerState extends State<CustomTicker>
         final textEndPadding = widget.tickerFontSize * 0.25 + borderPadding * 2;
         final renderedTextWidth = textWidth + textEndPadding;
         // Keep the next copy far enough away that it cannot overlap the last word.
-        // For some reason tickerGap not being variable makes it give error, 
+        // For some reason tickerGap not being variable makes it give error,
         //  so I made it as small as possible.
         final tickerGap = borderPadding / 10;
         final tickerWidth = renderedTextWidth + tickerGap + borderPadding * 2;

@@ -70,7 +70,7 @@ class Group {
 }
 
 class GroupSchedules {
-  final List<dynamic> slides;
+  final List<ScheduleItem> slides;
   final List<dynamic> frames;
   final List<dynamic> tickers;
 
@@ -82,7 +82,9 @@ class GroupSchedules {
 
   factory GroupSchedules.fromJson(Map<String, dynamic> json) {
     return GroupSchedules(
-      slides: json['slides'] as List? ?? [],
+      slides: (json['slides'] as List? ?? [])
+          .map((e) => ScheduleItem.fromJson(e))
+          .toList(),
       frames: json['frames'] as List? ?? [],
       tickers: json['tickers'] as List? ?? [],
     );

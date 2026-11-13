@@ -12,6 +12,7 @@ import 'package:flutter_video_test/cache_download/media_cacher_stub.dart'
     if (dart.library.js_interop) 'package:flutter_video_test/cache_download/media_cacher.dart';
 import 'package:flutter_video_test/app_download/media_deletion.dart';
 import 'package:flutter_video_test/app_download/media_downloader.dart';
+import 'package:flutter_video_test/classes/frame_ticker_position.dart';
 import 'package:flutter_video_test/classes/media_link.dart';
 import 'package:flutter_video_test/classes/ticker_link.dart';
 import 'package:intl/intl.dart';
@@ -92,7 +93,7 @@ class ApiCall {
     }
   }
 
-  Future<List<TickerLink>> getTickerLinksFromApi() async {
+  Future<(List<TickerLink>, List<TickerLink>)> getTickerLinksFromApi() async {
     try {
       final responseJson = _currentResponseJson;
       final data = responseJson == null
@@ -105,6 +106,27 @@ class ApiCall {
       debugPrint('Error fetching tickers from API: $e');
       rethrow;
     }
+  }
+
+  Future<({List<MediaLink> media, List<FrameLink> frames, (List<TickerLink>, List<TickerLink>) tickers})> loadSavedApiMedia() async {
+    final data = await _loadOldApiResponse();
+    final jsonString = await _shortenJsonData(data);
+    final now = DateTime.now();
+    final media = await _buildMediaFromResponse(
+      jsonString,
+      now: now,
+    );
+    await cleanupStoredMedia();
+    final frames = await _buildFramesFromResponse(
+      jsonString,
+      now: now,
+    );
+    final tickers = await _buildTickersFromResponse(
+      jsonString,
+      now: now,
+      useSavedTickerStrings: true,
+    );
+    return (media: media, frames: frames, tickers: tickers);
   }
 
   // Check if API responses are different
@@ -185,7 +207,7 @@ class ApiCall {
     return _buildFramesFromResponse(responseJson, now: now ?? DateTime.now());
   }
 
-  Future<List<TickerLink>> rebuildTickersForCurrentSchedules({
+  Future<(List<TickerLink>, List<TickerLink>)> rebuildTickersForCurrentSchedules({
     DateTime? now,
   }) async {
     final responseJson = _pendingResponseJson ?? _currentResponseJson;
@@ -363,18 +385,29 @@ class ApiCall {
 
     final frameLinks = await _convertFramesToFrameLinks(mainList);
     final downloadedFramesLinks = await _downloadFrames(frameLinks);
+    print('!! FRAME LINKS !!');
+    for(var link in downloadedFramesLinks) {
+      if(link.frameTickerPositions!.length <= 0) {
+        print('WAHT');
+        continue;
+      }
+      print(link.frameTickerPositions![0].frameId);
+    }
+    print('--------------------------------');
     _currentResponseJson = jsonString;
     _pendingResponseJson = null;
     _lastActiveScheduleFrameIds = _scheduleIds(groupSchedules, systemSchedules);
     return downloadedFramesLinks;
   }
 
-  Future<List<TickerLink>> _buildTickersFromResponse(
+  Future<(List<TickerLink>, List<TickerLink>)> _buildTickersFromResponse(
     String jsonString, {
     required DateTime now,
+    bool useSavedTickerStrings = false,
   }) async {
     final tickers = <dynamic>[];
     final mainList = <dynamic>[];
+    final secondaryList = <dynamic>[];
     final mapJson = jsonDecode(jsonString) as Map<String, dynamic>;
     final playlists = mapJson['playlists']['tickers'];
     _playlistsMapTickers.clear();
@@ -393,13 +426,22 @@ class ApiCall {
       now: now,
     );
 
-    _getPlaylistData(tickers, List.empty(), mainList, 'tickers');
+    _getPlaylistData(tickers, secondaryList, mainList, 'tickers');
 
-    final tickerLinks = await convertTickersToTickerLinks(mainList);
+    final tickerLinksMain = await convertTickersToTickerLinks(
+      mainList,
+      useSavedTickerStrings: useSavedTickerStrings,
+    );
+    final tickerLinksSecondary = await convertTickersToTickerLinks(
+      secondaryList,
+      useSavedTickerStrings: useSavedTickerStrings,
+    );
+    final downloadedTickerLinksMain = await _downloadTickers(tickerLinksMain);
+    final downloadedTickerLinksSecondary = await _downloadTickers(tickerLinksSecondary);
     _currentResponseJson = jsonString;
     _pendingResponseJson = null;
     _lastActiveScheduleTickerIds = _scheduleIds(groupSchedules, systemSchedules);
-    return tickerLinks;
+    return (downloadedTickerLinksMain, downloadedTickerLinksSecondary);
   }
 
   // Get JSON from api
@@ -630,7 +672,8 @@ class ApiCall {
     for (var schedule in schedules) {
       String playlistId = schedule["playlist"]["id"];
       bool slideShuffle = false;
-      var playlist;
+      int tickerBar = 0;
+      dynamic playlist;
       switch (type) {
         case 'slides':
           slideShuffle = schedule["slide_shuffle"] == 1;
@@ -640,6 +683,7 @@ class ApiCall {
           playlist = _playlistsMapFrames[playlistId];
           break;
         case 'tickers':
+          tickerBar = schedule["ticker_bar"];
           playlist = _playlistsMapTickers[playlistId];
           break;
       }
@@ -648,6 +692,12 @@ class ApiCall {
       slideShuffle
           ? shuffleList.addAll(slidesList)
           : mainList.addAll(slidesList);
+      
+      if (tickerBar != 0) {
+        tickerBar == 2
+            ? shuffleList.addAll(slidesList)
+            : mainList.addAll(slidesList);
+      }
     }
   }
 
@@ -704,6 +754,10 @@ class ApiCall {
   Future<List<FrameLink>> _convertFramesToFrameLinks(
     List<dynamic> frames,
   ) async {
+    final savedCoordinates = kIsWeb
+        ? <String, FrameCoordinates>{}
+        : await _downloader.loadSavedFrameCoordinates();
+
     // Get mimetype from given mimetype or from link extension
     String getMimeType(String type, item) {
       switch (_getFileExtension(item['image']['url'])) {
@@ -733,6 +787,7 @@ class ApiCall {
       int y1 = 0;
       int x2 = 0;
       int y2 = 0;
+      List<FrameTickerPosition> frameTickerPositions = [];
 
       if (_apiXmlHandler.checkPropertyExists(item)) {
         x1 = item['properties']['cutout']['x1'];
@@ -742,11 +797,27 @@ class ApiCall {
       } else if (_apiXmlHandler.checkCoordsInLink(url)) {
         (x1, y1, x2, y2) = _apiXmlHandler.extractAllQueryParams(url);
       } else {
-        String? xmlUrl = await _apiXmlHandler.convertLinkToXMLString(url);
-        if (xmlUrl == null || xmlUrl.isEmpty) {
-          continue;
+        final cachedCoordinates = id is String
+            ? savedCoordinates[id]
+            : null;
+        if (cachedCoordinates != null) {
+          x1 = cachedCoordinates.x1;
+          x2 = cachedCoordinates.x2;
+          y1 = cachedCoordinates.y1;
+          y2 = cachedCoordinates.y2;
+          frameTickerPositions = cachedCoordinates.frameTickerPositions;
+        } else {
+          String? xmlUrl = await _apiXmlHandler.convertLinkToXMLString(url);
+          if (xmlUrl == null || xmlUrl.isEmpty) {
+            continue;
+          }
+          (x1, y1, x2, y2) = await _apiXmlHandler.getCoordinates(xmlUrl);
+          frameTickerPositions = await _apiXmlHandler.getTickerCoordinates(xmlUrl, id);
+
+          if (!kIsWeb && id is String) {
+            savedCoordinates[id] = (x1: x1, x2: x2, y1: y1, y2: y2, frameTickerPositions: frameTickerPositions);
+          }
         }
-        (x1, y1, x2, y2) = await _apiXmlHandler.getCoordinates(xmlUrl);
       }
 
       frameLinks.add(
@@ -761,8 +832,13 @@ class ApiCall {
           y1: y1.toDouble(),
           x2: x2.toDouble(),
           y2: y2.toDouble(),
+          frameTickerPositions: frameTickerPositions,
         ),
       );
+    }
+
+    if (!kIsWeb && savedCoordinates.isNotEmpty) {
+      await _downloader.saveFrameCoordinates(savedCoordinates);
     }
 
     return frameLinks;
@@ -770,27 +846,32 @@ class ApiCall {
 
   @visibleForTesting
   Future<List<TickerLink>> convertTickersToTickerLinks(
-    List<dynamic> tickers,
-  ) async {
+    List<dynamic> tickers, {
+    bool useSavedTickerStrings = false,
+  }) async {
     List<TickerLink> tickerLinks = [];
     for (var item in tickers) {
       final type = 'ticker';
       var url = item['url'] as String;
       final id = item['id'] as String?;
       final amount = item['amount'] as int;
+      final creationType = item['type'] as String;
+      final tickerType = item['ticker_type'] as int?;
       if (url.isEmpty) {
         continue;
       }
-      List<String> tickerStrings = await _apiXmlHandler.getTickerStringFromXML(url, amount);
-      if(tickerStrings.isEmpty) {
-        continue;
-      }
+      final tickerStrings = useSavedTickerStrings
+          ? await _downloader.loadSavedTickerStrings(id ?? '')
+          : await _apiXmlHandler.getTickerStringFromXML(url, amount);
+      if (tickerStrings == null || tickerStrings.isEmpty) continue;
       tickerLinks.add(
         TickerLink(
           link: url,
           type: type,
           id: id,
           tickerStrings: tickerStrings,
+          creationType: creationType,
+          tickerType: tickerType,
         ),
       );
     }
@@ -819,6 +900,16 @@ class ApiCall {
     } else {
       return List<FrameLink>.from(
         await _downloader.downloadAllMedia(links: frames),
+      );
+    }
+  }
+
+  Future<List<TickerLink>> _downloadTickers(List<TickerLink> tickers) async {
+    if (kIsWeb) {
+      return List<TickerLink>.from(await _cacher.cacheAllMedia(links: tickers));
+    } else {
+      return List<TickerLink>.from(
+        await _downloader.downloadAllMedia(links: tickers)
       );
     }
   }

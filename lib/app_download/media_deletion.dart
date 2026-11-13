@@ -38,7 +38,7 @@ class MediaDeletion {
           ? filename
           : filename.substring(0, extensionIndex);
       if (!apiIds.contains(id)) {
-        print('Deleting ${id}');
+        print('Deleting $id');
         await entity.delete();
       }
     }

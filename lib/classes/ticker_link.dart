@@ -5,6 +5,8 @@ class TickerLink {
     this.id,
     this.blobUrl,
     this.localPath,
+    this.creationType,
+    this.tickerType,
     required this.tickerStrings,
   });
 
@@ -13,6 +15,7 @@ class TickerLink {
   final String type;
   final String? blobUrl;
   final String? localPath;
+  final String? creationType;
+  final int? tickerType;
   final List<String> tickerStrings;
-
 }

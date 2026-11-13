@@ -4,10 +4,14 @@ import 'dart:io';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_video_test/classes/frame_link.dart';
+import 'package:flutter_video_test/classes/frame_ticker_position.dart';
 import 'package:flutter_video_test/classes/media_link.dart';
 
 import 'package:dio/dio.dart';
+import 'package:flutter_video_test/classes/ticker_link.dart';
 import 'package:path_provider/path_provider.dart';
+
+typedef FrameCoordinates = ({int x1, int x2, int y1, int y2, List<FrameTickerPosition> frameTickerPositions});
 
 class MediaDownloader {
   MediaDownloader({Dio? dio}) : _dio = dio ?? Dio();
@@ -16,6 +20,83 @@ class MediaDownloader {
   Future<Directory> get downloadDirectory async {
     final directory = await getApplicationSupportDirectory();
     return directory;
+  }
+
+  Future<List<String>?> loadSavedTickerStrings(String tickerId) async {
+    final directory = await downloadDirectory;
+    final file = File('${directory.path}/tickers/$tickerId.txt');
+    if (!await file.exists()) return null;
+    return file.readAsLines();
+  }
+
+  Future<Map<String, FrameCoordinates>> loadSavedFrameCoordinates() async {
+    final directory = await downloadDirectory;
+    final file = File('${directory.path}/json/frame_coordinates.json');
+    if (!await file.exists()) return {};
+
+    final decoded = jsonDecode(await file.readAsString());
+    if (decoded is! List) {
+      throw const FormatException('Frame coordinates must be a JSON list.');
+    }
+
+    final coordinates = <String, FrameCoordinates>{};
+    for (final entry in decoded.whereType<Map<String, dynamic>>()) {
+      final id = entry['id'];
+      final x1 = entry['x1'];
+      final x2 = entry['x2'];
+      final y1 = entry['y1'];
+      final y2 = entry['y2'];
+      final frameTickerPositions = entry['frameTickerPositions'];
+      if (id is! String ||
+          id.isEmpty ||
+          x1 is! num ||
+          x2 is! num ||
+          y1 is! num ||
+          y2 is! num ||
+          frameTickerPositions is! List) {
+        continue;
+      }
+
+      final tickerPositions = <FrameTickerPosition>[];
+      for (final position in frameTickerPositions) {
+        if (position is Map<String, dynamic>) {
+          tickerPositions.add(FrameTickerPosition.fromJson(position));
+        }
+      }
+
+      coordinates[id] = (
+        x1: x1.toInt(),
+        x2: x2.toInt(),
+        y1: y1.toInt(),
+        y2: y2.toInt(),
+        frameTickerPositions: tickerPositions,
+      );
+    }
+
+    return coordinates;
+  }
+
+  Future<void> saveFrameCoordinates(
+    Map<String, FrameCoordinates> coordinates,
+  ) async {
+    final directory = await downloadDirectory;
+    final file = File('${directory.path}/json/frame_coordinates.json');
+    await file.parent.create(recursive: true);
+    await file.writeAsString(
+      const JsonEncoder.withIndent('  ').convert([
+        for (final entry in coordinates.entries)
+          {
+            'id': entry.key,
+            'x1': entry.value.x1,
+            'y1': entry.value.y1,
+            'x2': entry.value.x2,
+            'y2': entry.value.y2,
+            'frameTickerPositions': entry.value.frameTickerPositions
+                .map((position) => position.toJson())
+                .toList(),
+          },
+      ]),
+    );
   }
 
   Future<void> cleanupAppDirectory() async {
@@ -28,222 +109,6 @@ class MediaDownloader {
     }
 
     debugPrint('Cleaned: ${directory.path}');
-  }
-
-  Future<List<MediaLink>> loadDownloadedMedia() async {
-    final order = await _loadOrder();
-    final mediaEntries = order['media'] as List? ?? const [];
-    final mediaLinks = <MediaLink>[];
-
-    for (final entry in mediaEntries) {
-      if (entry is! Map<String, dynamic>) {
-        continue;
-      }
-
-      final mediaId = entry['id'];
-      if (mediaId is! String || mediaId.isEmpty) continue;
-
-      final duration = entry['duration'] is num
-          ? (entry['duration'] as num).toInt()
-          : null;
-      final localPath = entry['localPath'] is String
-          ? entry['localPath'] as String
-          : null;
-      final link = entry['link'] is String
-          ? entry['link'] as String
-          : localPath;
-      final type = entry['type'] is String ? entry['type'] as String : null;
-      final filePath =
-          localPath ??
-          await _findFileInDirectory(
-            directoryName: type == 'video' ? 'videos' : 'images',
-            mediaId: mediaId,
-          );
-
-      if (filePath == null || filePath.isEmpty) continue;
-
-      mediaLinks.add(
-        MediaLink(
-          id: mediaId,
-          link: link ?? filePath,
-          type: type ?? (filePath.contains('/videos/') ? 'video' : 'image'),
-          duration: duration,
-          mimeType: entry['mimeType'] is String
-              ? entry['mimeType'] as String
-              : null,
-          localPath: filePath,
-        ),
-      );
-    }
-
-    return mediaLinks;
-  }
-
-  Future<List<FrameLink>> loadDownloadedFrames() async {
-    final order = await _loadOrder();
-    final frameEntries = order['frames'] as List? ?? const [];
-    final frameLinks = <FrameLink>[];
-
-    for (final entry in frameEntries) {
-      if (entry is! Map<String, dynamic>) {
-        continue;
-      }
-
-      final frameId = entry['id'];
-      if (frameId is! String || frameId.isEmpty) continue;
-
-      final duration = entry['duration'] is num
-          ? (entry['duration'] as num).toInt()
-          : null;
-      final localPath = entry['localPath'] is String
-          ? entry['localPath'] as String
-          : null;
-      final link = entry['link'] is String
-          ? entry['link'] as String
-          : localPath;
-      final filePath =
-          localPath ??
-          await _findFileInDirectory(directoryName: 'frames', mediaId: frameId);
-      if (filePath == null || filePath.isEmpty) continue;
-
-      frameLinks.add(
-        FrameLink(
-          id: frameId,
-          link: link ?? filePath,
-          type: 'frame',
-          duration: duration,
-          mimeType: entry['mimeType'] is String
-              ? entry['mimeType'] as String
-              : null,
-          localPath: filePath,
-          creationType: entry['creationType'] is String
-              ? entry['creationType'] as String
-              : 'unknown',
-          x1: entry['x1'] is num ? (entry['x1'] as num).toDouble() : 0,
-          y1: entry['y1'] is num ? (entry['y1'] as num).toDouble() : 0,
-          x2: entry['x2'] is num ? (entry['x2'] as num).toDouble() : 0,
-          y2: entry['y2'] is num ? (entry['y2'] as num).toDouble() : 0,
-        ),
-      );
-    }
-
-    return frameLinks;
-  }
-
-  // Save the download order in a JSON file incase app starts without internet connection.
-  Future<void> _saveDownloadOrder({
-    List<dynamic>? media,
-    List<dynamic>? frames,
-  }) async {
-    final directory = await downloadDirectory;
-    final file = File('${directory.path}/json/download_order.json');
-    final content = await _readOrderFile(file);
-
-    final mediaOrder = <Map<String, dynamic>>[];
-    if (media != null) {
-      for (final item in media) {
-        if (item is MediaLink) {
-          mediaOrder.add({
-            'id': item.id,
-            'type': item.type,
-            'duration': item.duration ?? 0,
-            'localPath': item.localPath,
-            'link': item.link,
-            'mimeType': item.mimeType,
-          });
-        }
-      }
-    } else {
-      mediaOrder.addAll(
-        (content['media'] as List? ?? <dynamic>[])
-            .whereType<Map<String, dynamic>>()
-            .toList(),
-      );
-    }
-
-    final frameOrder = <Map<String, dynamic>>[];
-    if (frames != null) {
-      for (final item in frames) {
-        if (item is FrameLink) {
-          frameOrder.add({
-            'id': item.id,
-            'type': item.type,
-            'duration': item.duration ?? 0,
-            'localPath': item.localPath,
-            'link': item.link,
-            'mimeType': item.mimeType,
-            'creationType': item.creationType,
-            'x1': item.x1,
-            'y1': item.y1,
-            'x2': item.x2,
-            'y2': item.y2,
-          });
-        }
-      }
-    } else {
-      frameOrder.addAll(
-        (content['frames'] as List? ?? <dynamic>[])
-            .whereType<Map<String, dynamic>>()
-            .toList(),
-      );
-    }
-
-    final serialized = <String, dynamic>{
-      'media': mediaOrder,
-      'frames': frameOrder,
-    };
-
-    await file.parent.create(recursive: true);
-    await file.writeAsString(jsonEncode(serialized));
-  }
-
-  Future<Map<String, dynamic>> _readOrderFile(File file) async {
-    if (!await file.exists()) {
-      return <String, dynamic>{'media': <dynamic>[], 'frames': <dynamic>[]};
-    }
-
-    try {
-      final decoded = jsonDecode(await file.readAsString());
-      if (decoded is Map) {
-        final media = decoded['media'] is List
-            ? decoded['media'] as List
-            : <dynamic>[];
-        final frames = decoded['frames'] is List
-            ? decoded['frames'] as List
-            : <dynamic>[];
-        return {'media': media, 'frames': frames};
-      }
-    } catch (_) {}
-
-    return <String, dynamic>{'media': <dynamic>[], 'frames': <dynamic>[]};
-  }
-
-  Future<Map<String, dynamic>> _loadOrder() async {
-    final directory = await downloadDirectory;
-    final file = File('${directory.path}/json/download_order.json');
-    return _readOrderFile(file);
-  }
-
-  Future<String?> _findFileInDirectory({
-    required String directoryName,
-    required String mediaId,
-  }) async {
-    final directory = await downloadDirectory;
-    final targetDirectory = Directory('${directory.path}/$directoryName');
-    if (!await targetDirectory.exists()) return null;
-
-    final files = targetDirectory.listSync().whereType<File>();
-    for (final file in files) {
-      final name = file.uri.pathSegments.last;
-      final baseName = name.contains('.')
-          ? name.substring(0, name.lastIndexOf('.'))
-          : name;
-      if (baseName == mediaId) {
-        return file.path;
-      }
-    }
-
-    return null;
   }
 
   // Download all media gathered from media_sources
@@ -298,29 +163,43 @@ class MediaDownloader {
               mimeType: media.mimeType,
               localPath: path,
               creationType: media.creationType,
+
               x1: media.x1,
               x2: media.x2,
               y1: media.y1,
               y2: media.y2,
+
+              frameTickerPositions: media.frameTickerPositions,
             ),
           );
           debugPrint("(${media.type}) Downloaded: ${media.link} to ${path}");
           debugPrint("-------------------------------------------");
           break;
+        case 'ticker':
+          if(media.creationType == 'custom' && media.tickerType == 2) {
+            path = await _downloadTicker(link: media.link, name: media.id!, tickerStrings: media.tickerStrings);
+          }
+          downloadedLinks.add(
+            TickerLink(
+              id: media.id,
+              link: media.link,
+              type: media.type,
+              localPath: path,
+              creationType: media.creationType,
+              tickerStrings: media.tickerStrings
+            ),
+          );
+          if(path != '') {
+            debugPrint("(${media.type}) Downloaded: ${media.link} to ${path}");
+            debugPrint("-------------------------------------------");
+          } else {
+            debugPrint("(${media.type}) No custom ticker. Didn't download.");
+            debugPrint("-------------------------------------------");
+          }
+          break;
         default:
           break;
       }
-    }
-
-    if (downloadedLinks.any((entry) => entry is MediaLink)) {
-      await _saveDownloadOrder(
-        media: downloadedLinks.whereType<MediaLink>().toList(),
-      );
-    }
-    if (downloadedLinks.any((entry) => entry is FrameLink)) {
-      await _saveDownloadOrder(
-        frames: downloadedLinks.whereType<FrameLink>().toList(),
-      );
     }
 
     return downloadedLinks;
@@ -413,6 +292,27 @@ class MediaDownloader {
           onReceiveProgress: onReceiveProgress,
         );
       }
+    } catch (e) {
+      return '';
+    }
+
+    return file.path;
+  }
+
+  // Start download on frame
+  Future<String> _downloadTicker({
+    required String link,
+    required String name,
+    required List<String> tickerStrings,
+    void Function(int received, int total)? onReceiveProgress,
+  }) async {
+    final directory = await downloadDirectory;
+    final tickerDirectory = Directory('${directory.path}/tickers');
+    await tickerDirectory.create(recursive: true);
+    final file = File('${tickerDirectory.path}/$name.txt');
+
+    try {
+      await file.writeAsString(tickerStrings.join('\n'));
     } catch (e) {
       return '';
     }
