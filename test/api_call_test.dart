@@ -18,6 +18,12 @@ class _TestMediaDownloader extends MediaDownloader {
 class _TestApiXmlHandler extends ApiXmlHandler {
   @override
   Future<String?> convertLinkToXMLString(String link) async => null;
+
+  @override
+  Future<List<String>> getTickerStringFromXML(
+    String xmlString,
+    int amount,
+  ) async => ['Test ticker'];
 }
 
 const scheduleResponseJson = '''
@@ -113,7 +119,12 @@ void main() {
     final apiCall = ApiCall(apiXmlHandler: _TestApiXmlHandler());
 
     final tickerLinks = await apiCall.convertTickersToTickerLinks([
-      {'id': 'ticker-1', 'url': 'https://example.com/ticker.txt'},
+      {
+        'id': 'ticker-1',
+        'url': 'https://example.com/ticker.txt',
+        'amount': 1,
+        'type': 'custom',
+      },
     ]);
 
     expect(tickerLinks, hasLength(1));

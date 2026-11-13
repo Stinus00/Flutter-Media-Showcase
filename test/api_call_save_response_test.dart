@@ -111,6 +111,7 @@ void main() {
             'start': now.subtract(const Duration(hours: 1)).toIso8601String(),
             'end': now.add(const Duration(hours: 1)).toIso8601String(),
             'playlist': {'id': 'ticker-playlist-1', 'type': 'custom'},
+            'ticker_bar': 1,
           },
         ],
       },
@@ -231,8 +232,10 @@ void main() {
     expect(cached.frames.single.x2, 30);
     expect(cached.frames.single.y1, 20);
     expect(cached.frames.single.y2, 40);
-    expect(cached.tickers, hasLength(1));
-    expect(cached.tickers.single.id, 'ticker-1');
-    expect(cached.tickers.single.tickerStrings, ['Headline', 'Summary']);
+    final (mainTickers, secondaryTickers) = cached.tickers;
+    expect(mainTickers, hasLength(1));
+    expect(mainTickers.single.id, 'ticker-1');
+    expect(mainTickers.single.tickerStrings, ['Headline', 'Summary']);
+    expect(secondaryTickers, isEmpty);
   });
 }

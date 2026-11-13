@@ -91,7 +91,7 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
   String? creationType;
 
   // Ticker coordinates
-  List<FrameTickerPosition>? frameTickerPositions = [];
+  List<FrameTickerPosition> frameTickerPositions = [];
 
   // Check internet connection
   StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
@@ -275,10 +275,12 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
 
         (tickerLinksOne, tickerLinksTwo) = updatedTickerLinks;
 
-        _tickerLinksMain = tickerLinksOne;
-        _tickerLinksSecondary = tickerLinksTwo;
-
-        _updateTickers();
+        if (!mounted) return;
+        setState(() {
+          _tickerLinksMain = tickerLinksOne;
+          _tickerLinksSecondary = tickerLinksTwo;
+          _updateTickers();
+        });
       }
     });
   }
@@ -467,7 +469,7 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
     x2 = frame?.x2;
     y2 = frame?.y2;
     creationType = frame?.creationType;
-    frameTickerPositions = frame?.frameTickerPositions;
+    frameTickerPositions = frame?.frameTickerPositions ?? [];
   }
 
   void _updateTickers() {
@@ -842,8 +844,8 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
                             ),
                           ),
                           if (creationType == 'bcm') _buildMediaFrame(),
-                          if (frameTickerPositions!.isNotEmpty)
-                            for (var fPos in frameTickerPositions!)
+                          if (frameTickerPositions.isNotEmpty)
+                            for (var fPos in frameTickerPositions)
                               if (fPos.index == 1) 
                                 Positioned(
                                   key: ValueKey(fPos.index),
@@ -925,7 +927,7 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
       alignment: Alignment.bottomCenter,
       children: [
         _buildMediaContent(),
-        if (frameTickerPositions!.isEmpty) ...[
+        if (frameTickerPositions.isEmpty) ...[
           Positioned(
             key: ValueKey(1),
             left: 0,
@@ -941,7 +943,8 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
             child: _buildTickers(mediaHeight, tickerSecondary, key: _tickerKeyFor(2)),
           ),
         ]
-        else if (frameTickerPositions!.length == 1 && tickerSecondary.isNotEmpty)
+        else if (frameTickerPositions.length == 1 &&
+            tickerSecondary.isNotEmpty)
           Positioned(
             key: ValueKey(0),
             left: 0,
@@ -951,7 +954,7 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
               mediaHeight,
               tickerSecondary,
               key: _tickerKeyFor(
-                frameTickerPositions!.single.index == 1 ? 2 : -1,
+                frameTickerPositions.single.index == 1 ? 2 : -1,
               ),
             ),
           ),

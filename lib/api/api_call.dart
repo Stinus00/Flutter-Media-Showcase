@@ -877,7 +877,9 @@ class ApiCall {
   // Download all media gotten from API
   Future<List<MediaLink>> _downloadMedia(List<MediaLink> media) async {
     if (kIsWeb) {
-      return List<MediaLink>.from(await _cacher.cacheAllMedia(links: media));
+      return List<MediaLink>.from(
+        await _cacher.cacheAllMedia(links: media)
+      );
     } else {
       return List<MediaLink>.from(
         await _downloader.downloadAllMedia(links: media),
@@ -887,7 +889,9 @@ class ApiCall {
 
   Future<List<FrameLink>> _downloadFrames(List<FrameLink> frames) async {
     if (kIsWeb) {
-      return List<FrameLink>.from(await _cacher.cacheAllMedia(links: frames));
+      return List<FrameLink>.from(
+        await _cacher.cacheAllMedia(links: frames)
+      );
     } else {
       return List<FrameLink>.from(
         await _downloader.downloadAllMedia(links: frames),
@@ -897,7 +901,9 @@ class ApiCall {
 
   Future<List<TickerLink>> _downloadTickers(List<TickerLink> tickers) async {
     if (kIsWeb) {
-      return List<TickerLink>.from(await _cacher.cacheAllMedia(links: tickers));
+      return List<TickerLink>.from(
+        await _cacher.cacheAllMedia(links: tickers)
+      );
     } else {
       return List<TickerLink>.from(
         await _downloader.downloadAllMedia(links: tickers)
