@@ -58,7 +58,6 @@ class ApiXmlHandler {
 
       final posList = blockPos.first.split(';');
       final sizeList = blockSize.first.split(';');
-      print('SIZE $sizeList');
 
       final x1 = int.parse(posList[0]);
       final y1 = int.parse(posList[1]);

@@ -267,8 +267,6 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
     });
     _tickerCheckTimer ??= Timer.periodic(const Duration(minutes: 10), (_) async { // Check if tickersources have changed
       if(_hasNetworkConnection == true) {
-        debugPrint('-----------------------------');
-        debugPrint('updating tickers');
         final updatedTickerLinks = await _apiCall
             .rebuildTickersForCurrentSchedules(now: DateTime.now());
         
@@ -1127,11 +1125,10 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
           );
   }
 
-  Widget _buildTickers(double mediaHeight, List<String> tickerString, {Key? key, bool backwards = false, bool inFrame = false, int fontSize = 0}) {
+  Widget _buildTickers(double mediaHeight, List<String> tickerString, {Key? key, bool LtoR = false, bool inFrame = false, int fontSize = 0}) {
     final percent = 0.10;
     double fontSizeInternal = mediaHeight * percent;
     if(fontSize != 0) {
-      print(mediaHeight);
       fontSizeInternal = fontSize.toDouble() * (mediaHeight * 0.01);
     }
     const textColor = Colors.white;
@@ -1145,7 +1142,7 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
       tickerSpeed: tickerSpeed,
       tickerFontSize: fontSizeInternal,
       tickerSymbol: '•',
-      leftToRight: backwards,
+      leftToRight: LtoR,
       border: true,
       borderColor: borderColor,
       borderWidth: borderWidth,

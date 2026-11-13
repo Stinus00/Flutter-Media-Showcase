@@ -385,15 +385,6 @@ class ApiCall {
 
     final frameLinks = await _convertFramesToFrameLinks(mainList);
     final downloadedFramesLinks = await _downloadFrames(frameLinks);
-    print('!! FRAME LINKS !!');
-    for(var link in downloadedFramesLinks) {
-      if(link.frameTickerPositions!.length <= 0) {
-        print('WAHT');
-        continue;
-      }
-      print(link.frameTickerPositions![0].frameId);
-    }
-    print('--------------------------------');
     _currentResponseJson = jsonString;
     _pendingResponseJson = null;
     _lastActiveScheduleFrameIds = _scheduleIds(groupSchedules, systemSchedules);
@@ -688,15 +679,15 @@ class ApiCall {
           break;
       }
       var slidesList = playlist[type];
-
-      slideShuffle
-          ? shuffleList.addAll(slidesList)
-          : mainList.addAll(slidesList);
       
       if (tickerBar != 0) {
         tickerBar == 2
             ? shuffleList.addAll(slidesList)
             : mainList.addAll(slidesList);
+      } else {
+        slideShuffle
+          ? shuffleList.addAll(slidesList)
+          : mainList.addAll(slidesList);
       }
     }
   }
