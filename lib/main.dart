@@ -5,6 +5,7 @@ import 'dart:math' as math;
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_video_test/classes/frame_ticker_position.dart';
 import 'package:video_player/video_player.dart';
 import 'package:video_player_media_kit/video_player_media_kit.dart';
@@ -13,7 +14,7 @@ import 'package:wakelock_plus/wakelock_plus.dart';
 import 'classes/media_link.dart';
 import 'classes/frame_link.dart';
 import 'classes/ticker_link.dart';
-import 'classes/custom_ticker.dart';
+import 'widgets/custom_ticker.dart';
 
 import 'api/api_call.dart';
 import 'cache_download/page_reloader_stub.dart'
@@ -33,6 +34,12 @@ class VideoApp extends StatefulWidget {
 class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
   final MediaCacher _mediaCacher = MediaCacher();
   final ApiCall _apiCall = ApiCall();
+  final FocusNode _nextPlaylistButtonFocusNode = FocusNode(
+    debugLabel: 'Refresh playlist button',
+  );
+  final FocusNode _settingsButtonFocusNode = FocusNode(
+    debugLabel: 'Settings button',
+  );
 
   // Lists.
   List<MediaLink> _mediaLinks = [];
@@ -56,6 +63,7 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
   Timer? _imageTimer;
   Timer? _frameTimer;
   Timer? _reloadTimer;
+  Timer? _showSettingsTimer;
   ImageProvider? _activeImageProvider;
 
   // Errors
@@ -102,6 +110,11 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
       _mediaLinks.isEmpty ? null : _mediaLinks[_currentLinkIndex];
   FrameLink? get _currentMediaFrame =>
       _frameLinks.isEmpty ? null : _frameLinks[_currentLinkIndexFrame];
+
+  // Test
+  double x = 0.0;
+  double y = 0.0;
+  bool _hideSettings = false;
 
   @override
   void initState() {
@@ -167,7 +180,6 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
 
   // Download the media given and initialize the first media.
   Future<void> _prepareMedia({bool startChangeChecks = false}) async {
-
     try {
       if (_mediaLinks.isEmpty) {
         _mediaLinks = await _apiCall.getMediaFromApi();
@@ -179,8 +191,9 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
       List<TickerLink> tickerLinksOne = [];
       List<TickerLink> tickerLinksTwo = [];
 
-      if(_tickerLinksMain.isEmpty) {
-        (tickerLinksOne, tickerLinksTwo) = await _apiCall.getTickerLinksFromApi();
+      if (_tickerLinksMain.isEmpty) {
+        (tickerLinksOne, tickerLinksTwo) = await _apiCall
+            .getTickerLinksFromApi();
       }
       _tickerLinksMain = tickerLinksOne;
       _tickerLinksSecondary = tickerLinksTwo;
@@ -239,7 +252,8 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
     _payloadCheckTimer?.cancel();
     _tickerCheckTimer?.cancel();
 
-    _scheduleCheckTimer ??= Timer.periodic(const Duration(minutes: 1), (_) { // Check if schedules have changed
+    _scheduleCheckTimer ??= Timer.periodic(const Duration(minutes: 1), (_) {
+      // Check if schedules have changed
       if (_mediaLinks.isEmpty) {
         setState(() {
           _preloadError = null;
@@ -251,8 +265,9 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
         });
       }
     });
-    _payloadCheckTimer ??= Timer.periodic(const Duration(minutes: 15), (_) { // Check if API callback has changed
-      if(_hasNetworkConnection == true) {
+    _payloadCheckTimer ??= Timer.periodic(const Duration(minutes: 15), (_) {
+      // Check if API callback has changed
+      if (_hasNetworkConnection == true) {
         if (_mediaLinks.isEmpty) {
           setState(() {
             _preloadError = null;
@@ -265,11 +280,14 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
         }
       }
     });
-    _tickerCheckTimer ??= Timer.periodic(const Duration(minutes: 10), (_) async { // Check if tickersources have changed
-      if(_hasNetworkConnection == true) {
+    _tickerCheckTimer ??= Timer.periodic(const Duration(minutes: 10), (
+      _,
+    ) async {
+      // Check if tickersources have changed
+      if (_hasNetworkConnection == true) {
         final updatedTickerLinks = await _apiCall
             .rebuildTickersForCurrentSchedules(now: DateTime.now());
-        
+
         List<TickerLink> tickerLinksOne = [];
         List<TickerLink> tickerLinksTwo = [];
 
@@ -285,6 +303,17 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
     });
   }
 
+  void _startIdleTimer() {
+    _showSettingsTimer?.cancel();
+    _showSettingsTimer = Timer(const Duration(seconds: 10), () {
+      if (!mounted) return;
+      setState(() {
+        _hideSettings = true;
+      });
+      print('showSettings');
+    });
+  }
+
   // Check if there's any changes in api or schedules
   // Clear everything if there are changes.
   Future<void> _checkForMediaChanges({bool checkPayload = false}) async {
@@ -295,10 +324,13 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
     }
     _isCheckingForChanges = true;
     try {
-      final payloadChanged = checkPayload == true // Check if callback has changed
+      final payloadChanged =
+          checkPayload ==
+              true // Check if callback has changed
           ? await _apiCall.hasPayloadChanged()
           : false;
-      final schedulesChanged = _apiCall.haveSchedulesChanged(); // Check if changes in schedule
+      final schedulesChanged = _apiCall
+          .haveSchedulesChanged(); // Check if changes in schedule
       if (!payloadChanged && !schedulesChanged) {
         await _apiCall.cleanupStoredMedia();
         return;
@@ -311,7 +343,7 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
           .rebuildFramesForCurrentSchedules();
       final updatedTickerLinks = await _apiCall
           .rebuildTickersForCurrentSchedules();
-    
+
       // Clear everything for future use
       _isChangingVideo = true;
       _imageTimer?.cancel();
@@ -395,6 +427,7 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
       if (!mounted) return;
       setState(() {});
       _startImageTimer(media);
+      _startIdleTimer();
       return;
     }
 
@@ -474,11 +507,11 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
 
   void _updateTickers() {
     tickerMain = [];
-    for(final ticker in _tickerLinksMain) {
+    for (final ticker in _tickerLinksMain) {
       tickerMain += ticker.tickerStrings;
     }
     tickerSecondary = [];
-    for(final ticker in _tickerLinksSecondary) {
+    for (final ticker in _tickerLinksSecondary) {
       tickerSecondary += ticker.tickerStrings;
     }
   }
@@ -806,9 +839,16 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
     }
   }
 
-  // Widget to display the app
+  // Widget to display the appf
   @override
   Widget build(BuildContext context) {
+    void updateSettings() {
+      _startIdleTimer();
+      setState(() {
+        _hideSettings = false;
+      });
+    }
+
     return MaterialApp(
       title: 'Video Demo',
       theme: ThemeData(scaffoldBackgroundColor: Colors.black),
@@ -822,96 +862,158 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
               constraints.maxHeight / canvasHeight,
             );
 
-            return Stack(
-              alignment: Alignment.center,
-              children: [
-                // Check if there's frame coordinates.
-                // // If there is build frame and put media inside frame.
-                // // If there isn't just build media.
-                if (x1 != null)
-                  Center(
-                    child: SizedBox(
-                      width: canvasWidth * scale,
-                      height: canvasHeight * scale,
-                      child: Stack(
-                        children: [
-                          _buildMediaFrame(),
-                          Positioned(
-                            left: x1! * scale,
-                            top: y1! * scale,
-                            width: (x2! - x1!) * scale,
-                            height: (y2! - y1!) * scale,
-                            child: ClipRect(
-                              child: _buildMedia((y2! - y1!) * scale),
+            return Focus(
+              autofocus: true,
+              onKeyEvent: (node, event) {
+                final isArrowKey =
+                    event.logicalKey == LogicalKeyboardKey.arrowUp ||
+                    event.logicalKey == LogicalKeyboardKey.arrowDown ||
+                    event.logicalKey == LogicalKeyboardKey.arrowLeft ||
+                    event.logicalKey == LogicalKeyboardKey.arrowRight;
+                if (isArrowKey &&
+                    (event is KeyDownEvent || event is KeyRepeatEvent)) {
+                  final wasHidden = _hideSettings;
+                  updateSettings();
+                  if (wasHidden) {
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      if (mounted) {
+                        _nextPlaylistButtonFocusNode.requestFocus();
+                      }
+                    });
+                  } else if (_settingsButtonFocusNode.hasFocus &&
+                      event.logicalKey == LogicalKeyboardKey.arrowDown) {
+                    _nextPlaylistButtonFocusNode.requestFocus();
+                  } else if (_nextPlaylistButtonFocusNode.hasFocus &&
+                      event.logicalKey == LogicalKeyboardKey.arrowUp) {
+                    _settingsButtonFocusNode.requestFocus();
+                  } else if (!_settingsButtonFocusNode.hasFocus &&
+                      !_nextPlaylistButtonFocusNode.hasFocus) {
+                    _nextPlaylistButtonFocusNode.requestFocus();
+                  } else {
+                    return KeyEventResult.handled;
+                  }
+                  return KeyEventResult.handled;
+                }
+                return KeyEventResult.ignored;
+              },
+              child: MouseRegion(
+                onHover: (event) => updateSettings(),
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTapDown: (details) => updateSettings(),
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      // Check if there's frame coordinates.
+                      // // If there is build frame and put media inside frame.
+                      // // If there isn't just build media.
+                      if (x1 != null)
+                        Center(
+                          child: SizedBox(
+                            width: canvasWidth * scale,
+                            height: canvasHeight * scale,
+                            child: Stack(
+                              children: [
+                                _buildMediaFrame(),
+                                Positioned(
+                                  left: x1! * scale,
+                                  top: y1! * scale,
+                                  width: (x2! - x1!) * scale,
+                                  height: (y2! - y1!) * scale,
+                                  child: ClipRect(
+                                    child: _buildMedia((y2! - y1!) * scale),
+                                  ),
+                                ),
+                                if (creationType == 'bcm') _buildMediaFrame(),
+                                if (frameTickerPositions.isNotEmpty)
+                                  for (var fPos in frameTickerPositions)
+                                    if (fPos.index == 1)
+                                      Positioned(
+                                        key: ValueKey(fPos.index),
+                                        left: fPos.x1 * scale,
+                                        top: fPos.y1 * scale,
+                                        width: (fPos.x2 - fPos.x1) * scale,
+                                        height: (fPos.y2 - fPos.y1) * scale,
+                                        child: ClipRect(
+                                          child: _buildTickers(
+                                            (fPos.y2 - fPos.y1) * scale,
+                                            tickerMain,
+                                            key: _tickerKeyFor(fPos.index),
+                                            inFrame: true,
+                                            fontSize: fPos.fontSize!,
+                                            fontColor: fPos.fontColor,
+                                          ),
+                                        ),
+                                      )
+                                    else
+                                      Positioned(
+                                        key: ValueKey(fPos.index),
+                                        left: fPos.x1 * scale,
+                                        top: fPos.y1 * scale,
+                                        width: (fPos.x2 - fPos.x1) * scale,
+                                        height: (fPos.y2 - fPos.y1) * scale,
+                                        child: ClipRect(
+                                          child: _buildTickers(
+                                            (fPos.y2 - fPos.y1) * scale,
+                                            tickerSecondary,
+                                            key: _tickerKeyFor(fPos.index),
+                                            inFrame: true,
+                                            fontSize: fPos.fontSize!,
+                                            fontColor: fPos.fontColor,
+                                          ),
+                                        ),
+                                      ),
+                              ],
                             ),
                           ),
-                          if (creationType == 'bcm') _buildMediaFrame(),
-                          if (frameTickerPositions.isNotEmpty)
-                            for (var fPos in frameTickerPositions)
-                              if (fPos.index == 1) 
-                                Positioned(
-                                  key: ValueKey(fPos.index),
-                                  left: fPos.x1 * scale,
-                                  top: fPos.y1 * scale,
-                                  width: (fPos.x2 - fPos.x1) * scale,
-                                  height: (fPos.y2 - fPos.y1) * scale,
-                                  child: ClipRect(
-                                    child: _buildTickers((fPos.y2 - fPos.y1) * scale, tickerMain, key: _tickerKeyFor(fPos.index), inFrame: true, fontSize: fPos.fontSize!, fontColor: fPos.fontColor)
-                                  ),
-                                )
-                              else
-                                Positioned(
-                                  key: ValueKey(fPos.index),
-                                  left: fPos.x1 * scale,
-                                  top: fPos.y1 * scale,
-                                  width: (fPos.x2 - fPos.x1) * scale,
-                                  height: (fPos.y2 - fPos.y1) * scale,
-                                  child: ClipRect(
-                                    child: _buildTickers((fPos.y2 - fPos.y1) * scale, tickerSecondary, key: _tickerKeyFor(fPos.index), inFrame: true, fontSize: fPos.fontSize!, fontColor: fPos.fontColor)
-                                  ),
-                                )
-                            
-                        ],
-                      ),
-                    ),
-                  )
-                else
-                  Center(child: _buildMedia(canvasHeight * scale)),
-                Positioned(
-                  right: 16,
-                  bottom: 16,
-                  child: _buildNextPlaylistButton(),
-                ),
-                if (_hasNetworkConnection == false)
-                  Align(
-                    alignment: Alignment.topLeft,
-                    child: Stack(
-                      alignment: Alignment.topLeft,
-                      children: [
-                        // White silhouette behind the original transparent image
-                        Transform.translate(
-                          offset: const Offset(-2.5, -2.5),
-                          child: ColorFiltered(
-                            colorFilter: const ColorFilter.mode(
-                              Colors.black,
-                              BlendMode.srcIn,
-                            ),
-                            child: Image.asset(
-                              'assets/no-internet.png',
-                              width: 85,
-                            ),
-                          ),
+                        )
+                      else
+                        Center(child: _buildMedia(canvasHeight * scale)),
+                      if (!_hideSettings)
+                        Positioned(
+                          right: 16,
+                          bottom: 16,
+                          child: _buildNextPlaylistButton(),
                         ),
+                      if (!_hideSettings)
+                        Positioned(
+                          right: 16,
+                          top: 16,
+                          child: _buildSettingsButton(),
+                        ),
+                      if (_hasNetworkConnection == false)
+                        Align(
+                          alignment: Alignment.topLeft,
+                          child: Stack(
+                            alignment: Alignment.topLeft,
+                            children: [
+                              // White silhouette behind the original transparent image
+                              Transform.translate(
+                                offset: const Offset(-2.5, -2.5),
+                                child: ColorFiltered(
+                                  colorFilter: const ColorFilter.mode(
+                                    Colors.black,
+                                    BlendMode.srcIn,
+                                  ),
+                                  child: Image.asset(
+                                    'assets/no-internet.png',
+                                    width: 85,
+                                  ),
+                                ),
+                              ),
 
-                        Image.asset(
-                          'assets/no-internet.png',
-                          width: 80,
-                          color: Colors.red,
+                              Image.asset(
+                                'assets/no-internet.png',
+                                width: 80,
+                                color: Colors.red,
+                              ),
+                            ],
+                          ),
                         ),
-                      ],
-                    ),
+                    ],
                   ),
-              ],
+                ),
+              ),
             );
           },
         ),
@@ -935,17 +1037,24 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
             left: 0,
             right: 0,
             bottom: -5,
-            child: _buildTickers(mediaHeight, tickerMain, key: _tickerKeyFor(1)),
+            child: _buildTickers(
+              mediaHeight,
+              tickerMain,
+              key: _tickerKeyFor(1),
+            ),
           ),
           Positioned(
             key: ValueKey(0),
             left: 0,
             right: 0,
             top: 0,
-            child: _buildTickers(mediaHeight, tickerSecondary, key: _tickerKeyFor(2)),
+            child: _buildTickers(
+              mediaHeight,
+              tickerSecondary,
+              key: _tickerKeyFor(2),
+            ),
           ),
-        ]
-        else if (frameTickerPositions.length == 1 &&
+        ] else if (frameTickerPositions.length == 1 &&
             tickerSecondary.isNotEmpty)
           Positioned(
             key: ValueKey(0),
@@ -1130,17 +1239,25 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
           );
   }
 
-  Widget _buildTickers(double mediaHeight, List<String> tickerString, {Key? key, bool LtoR = false, bool inFrame = false, int fontSize = 0, Color? fontColor = Colors.white}) {
+  Widget _buildTickers(
+    double mediaHeight,
+    List<String> tickerString, {
+    Key? key,
+    bool LtoR = false,
+    bool inFrame = false,
+    int fontSize = 0,
+    Color? fontColor = Colors.white,
+  }) {
     final percent = 0.10;
     double fontSizeInternal = mediaHeight * percent;
-    if(fontSize != 0) {
+    if (fontSize != 0) {
       fontSizeInternal = fontSize.toDouble() * (mediaHeight * 0.01);
     }
 
     bool border = true;
     Color textColor = Colors.white;
     Color borderColor = Colors.black;
-    if(fontColor != null && fontColor != Colors.white) {
+    if (fontColor != null && fontColor != Colors.white) {
       border = false;
       textColor = fontColor;
     }
@@ -1171,7 +1288,8 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
         child: FadeTransition(opacity: animation, child: child),
       ),
       child: FloatingActionButton.extended(
-        key: const ValueKey('sample-button'),
+        key: const ValueKey('next-playlist-button'),
+        focusNode: _nextPlaylistButtonFocusNode,
         backgroundColor: const Color.fromARGB(98, 59, 128, 255),
         hoverColor: const Color.fromARGB(97, 45, 119, 255),
         foregroundColor: Colors.white,
@@ -1196,6 +1314,30 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
     );
   }
 
+  // Button to open settings
+  Widget _buildSettingsButton() {
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 250),
+      transitionBuilder: (child, animation) => ScaleTransition(
+        scale: animation,
+        child: FadeTransition(opacity: animation, child: child),
+      ),
+      child: FloatingActionButton.extended(
+        key: const ValueKey('settings-button'),
+        focusNode: _settingsButtonFocusNode,
+        backgroundColor: const Color.fromARGB(98, 59, 128, 255),
+        hoverColor: const Color.fromARGB(97, 45, 119, 255),
+        foregroundColor: Colors.white,
+        elevation: 0,
+        onPressed: () {
+          print('banana');
+        },
+        icon: const Icon(Icons.play_arrow),
+        label: const Text('Settings'),
+      ),
+    );
+  }
+
   // Restart Timers after app has been to background.
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
@@ -1211,6 +1353,9 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
     _imageTimer?.cancel();
     _frameTimer?.cancel();
     _reloadTimer?.cancel();
+    _showSettingsTimer?.cancel();
+    _nextPlaylistButtonFocusNode.dispose();
+    _settingsButtonFocusNode.dispose();
     unawaited(_connectivitySubscription?.cancel());
     _scheduleCheckTimer?.cancel();
     _payloadCheckTimer?.cancel();
