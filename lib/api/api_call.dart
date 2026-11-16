@@ -51,6 +51,7 @@ class ApiCall {
   // For Web
   String? oldJson;
 
+  // Dictionary of playlist
   final _playlistsMapMedia = {};
   final _playlistsMapFrames = {};
   final _playlistsMapTickers = {};
@@ -108,6 +109,7 @@ class ApiCall {
     }
   }
 
+  // Load saved API data when offline
   Future<({List<MediaLink> media, List<FrameLink> frames, (List<TickerLink>, List<TickerLink>) tickers})> loadSavedApiMedia() async {
     final data = await _loadOldApiResponse();
     final jsonString = await _shortenJsonData(data);
@@ -217,49 +219,6 @@ class ApiCall {
     return _buildTickersFromResponse(responseJson, now: now ?? DateTime.now());
   }
 
-  // Build media list from response
-  Future<List<MediaLink>> _buildMediaFromResponse(
-    String jsonString, {
-    required DateTime now,
-  }) async {
-    final media = <dynamic>[];
-    final shuffleList = <dynamic>[];
-    final mainList = <dynamic>[];
-    final combinedList = <dynamic>[];
-    final mapJson = jsonDecode(jsonString) as Map<String, dynamic>;
-    final playlists = mapJson['playlists']['slides'];
-    _playlistsMapMedia.clear();
-    _mapPlaylists(playlists);
-
-    final groupSchedules = _getGroupSchedules(
-      media,
-      mapJson,
-      'slides',
-      now: now,
-    );
-    final systemSchedules = _getSystemSchedules(
-      media,
-      mapJson,
-      'slides',
-      now: now,
-    );
-
-    _getPlaylistData(media, shuffleList, mainList, 'slides');
-    shuffleList.shuffle();
-
-    combinedList
-      ..addAll(mainList)
-      ..addAll(shuffleList);
-
-    final mediaLinks = await _convertMediaToMediaLink(combinedList);
-    final downloadedMediaLinks = await _downloadMedia(mediaLinks);
-    await _saveApiResponse(jsonString);
-    _currentResponseJson = jsonString;
-    _pendingResponseJson = null;
-    _lastActiveScheduleIds = _scheduleIds(groupSchedules, systemSchedules);
-    return downloadedMediaLinks;
-  }
-
   // Get the media Ids gathered from response
   @visibleForTesting
   ({Set<String> images, Set<String> videos, Set<String> frames})
@@ -356,6 +315,49 @@ class ApiCall {
     return (images: imageIds, videos: videoIds, frames: frameIds);
   }
 
+  // Build media list from response
+  Future<List<MediaLink>> _buildMediaFromResponse(
+    String jsonString, {
+    required DateTime now,
+  }) async {
+    final media = <dynamic>[];
+    final shuffleList = <dynamic>[];
+    final mainList = <dynamic>[];
+    final combinedList = <dynamic>[];
+    final mapJson = jsonDecode(jsonString) as Map<String, dynamic>;
+    final playlists = mapJson['playlists']['slides'];
+    _playlistsMapMedia.clear();
+    _mapPlaylists(playlists);
+
+    final groupSchedules = _getGroupSchedules(
+      media,
+      mapJson,
+      'slides',
+      now: now,
+    );
+    final systemSchedules = _getSystemSchedules(
+      media,
+      mapJson,
+      'slides',
+      now: now,
+    );
+
+    _getPlaylistData(media, shuffleList, mainList, 'slides');
+    shuffleList.shuffle();
+
+    combinedList
+      ..addAll(mainList)
+      ..addAll(shuffleList);
+
+    final mediaLinks = await _convertMediaToMediaLink(combinedList);
+    final downloadedMediaLinks = await _downloadMedia(mediaLinks);
+    await _saveApiResponse(jsonString);
+    _currentResponseJson = jsonString;
+    _pendingResponseJson = null;
+    _lastActiveScheduleIds = _scheduleIds(groupSchedules, systemSchedules);
+    return downloadedMediaLinks;
+  }
+
   // Build frames list from response
   Future<List<FrameLink>> _buildFramesFromResponse(
     String jsonString, {
@@ -391,6 +393,8 @@ class ApiCall {
     return downloadedFramesLinks;
   }
 
+  // Build ticker lists from response
+  // // Two lists for the different tickers
   Future<(List<TickerLink>, List<TickerLink>)> _buildTickersFromResponse(
     String jsonString, {
     required DateTime now,
@@ -637,6 +641,7 @@ class ApiCall {
     }
   }
 
+  // Place playlists in dictionary for easier retrieval later
   Future<void> _mapFramePlaylists(List<dynamic> playlists) async {
     for (var playlist in playlists) {
       if (_playlistsMapFrames[playlist['id']] != null) continue;
@@ -645,6 +650,7 @@ class ApiCall {
     }
   }
 
+  // Place playlists in dictionary for easier retrieval later
   Future<void> _mapTickerPlaylists(List<dynamic> playlists) async {
     for (var playlist in playlists) {
       if (_playlistsMapTickers[playlist['id']] != null) continue;
@@ -781,13 +787,17 @@ class ApiCall {
       List<FrameTickerPosition> frameTickerPositions = [];
 
       if (_apiXmlHandler.checkPropertyExists(item)) {
+        // If there's properties use properties for coordinates
         x1 = item['properties']['cutout']['x1'];
         y1 = item['properties']['cutout']['y1'];
         x2 = item['properties']['cutout']['x2'];
         y2 = item['properties']['cutout']['y2'];
       } else if (_apiXmlHandler.checkCoordsInLink(url)) {
+        // If there's coordinates in the link use coordinates in link
         (x1, y1, x2, y2) = _apiXmlHandler.extractAllQueryParams(url);
       } else {
+        // If there's an XML file use the XML file for coordinates
+        // // Also save Ticker coordinates
         final cachedCoordinates = id is String
             ? savedCoordinates[id]
             : null;
@@ -887,6 +897,7 @@ class ApiCall {
     }
   }
 
+  // Download all frames gotten from API
   Future<List<FrameLink>> _downloadFrames(List<FrameLink> frames) async {
     if (kIsWeb) {
       return List<FrameLink>.from(
@@ -899,6 +910,7 @@ class ApiCall {
     }
   }
 
+  // Download all tickers gotten from API
   Future<List<TickerLink>> _downloadTickers(List<TickerLink> tickers) async {
     if (kIsWeb) {
       return List<TickerLink>.from(

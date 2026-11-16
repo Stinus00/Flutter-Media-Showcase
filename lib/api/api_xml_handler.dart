@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_video_test/classes/frame_ticker_position.dart';
 import 'package:xml/xml.dart';
 
@@ -38,6 +39,11 @@ class ApiXmlHandler {
     
     List<FrameTickerPosition> tickerPositions = [];
 
+    // For every TextBlock found in XML file
+    //   1. Get the Index
+    //   2. Get the position
+    //   3. Get the size
+    //   4. Get the fontsize
     for(var block in textBlocks) {
       final indexString = block
           .findAllElements('TB_Index')
@@ -54,6 +60,10 @@ class ApiXmlHandler {
           .findAllElements('TB_FontSize')
           .map((element) => element.innerText);
       
+      final fontColorString = block
+          .findAllElements('TB_FontColor')
+          .map((element) => element.innerText);
+      
       final index = int.parse(indexString.first);
 
       final posList = blockPos.first.split(';');
@@ -66,6 +76,13 @@ class ApiXmlHandler {
 
       final fontSize = int.parse(fontSizeString.first);
 
+      final argbList = fontColorString.first.split(';');
+
+      final a = int.parse(argbList[0]);
+      final r = int.parse(argbList[1]);
+      final g = int.parse(argbList[2]);
+      final b = int.parse(argbList[3]);
+
       tickerPositions.add(
         FrameTickerPosition(
           index: index, 
@@ -75,6 +92,7 @@ class ApiXmlHandler {
           x2: x2, 
           y2: y2,
           fontSize: fontSize,
+          fontColor: Color.fromARGB(a, r, g, b)
       ));
     }
     return tickerPositions;
@@ -150,6 +168,7 @@ class ApiXmlHandler {
 
   // TICKERS
   Future<List<String>> getTickerStringFromXML(String xmlString, int amount) async{
+    // Remove | data from string
     List<dynamic> strings = xmlString.split('|');
     List<String> tickerStrings = [];
     int limit = amount;
@@ -157,13 +176,13 @@ class ApiXmlHandler {
 
     xmlString = strings[0];
     int type = 0;
+    // Check if there's | data in string
     if(strings.length > 1)
     {
       type = int.parse(strings[2]);
     }
 
-    // String bcmString = 'http://localhost:8000/?url=$xmlString';
-    // String bcmString = 'https://unquote-stencil-sandbag.ngrok-free.dev/?url=$xmlString';
+    // Use Relay server to avoid CORS
     String bcmString = 'https://rssrelay-strato.bcmserver.com/?url=$xmlString';
 
     try {
@@ -181,6 +200,9 @@ class ApiXmlHandler {
       final items = document
           .findAllElements('item');
       
+      // For every item in XML file
+      // // 1. Find the title and add it to list
+      // // 3. Find the title and description and add it to list
       for (var item in items) {
         if (count >= limit) {
           break;

@@ -699,14 +699,16 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
     _videoErrorIndex = null;
     _imageError = null;
     _imagePath = null;
-    _isChangingVideo = false;
     setState(() {});
 
     await controller?.dispose();
     controller = null;
     await _evictActiveImage();
     await _checkPendingMediaChanges();
-    _handleVideoState();
+    _isChangingVideo = false;
+    if (mounted) {
+      _handleVideoState();
+    }
   }
 
   // Play next image.
@@ -854,7 +856,7 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
                                   width: (fPos.x2 - fPos.x1) * scale,
                                   height: (fPos.y2 - fPos.y1) * scale,
                                   child: ClipRect(
-                                    child: _buildTickers((fPos.y2 - fPos.y1) * scale, tickerMain, key: _tickerKeyFor(fPos.index), inFrame: true, fontSize: fPos.fontSize!)
+                                    child: _buildTickers((fPos.y2 - fPos.y1) * scale, tickerMain, key: _tickerKeyFor(fPos.index), inFrame: true, fontSize: fPos.fontSize!, fontColor: fPos.fontColor)
                                   ),
                                 )
                               else
@@ -865,7 +867,7 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
                                   width: (fPos.x2 - fPos.x1) * scale,
                                   height: (fPos.y2 - fPos.y1) * scale,
                                   child: ClipRect(
-                                    child: _buildTickers((fPos.y2 - fPos.y1) * scale, tickerSecondary, key: _tickerKeyFor(fPos.index), inFrame: true, fontSize: fPos.fontSize!)
+                                    child: _buildTickers((fPos.y2 - fPos.y1) * scale, tickerSecondary, key: _tickerKeyFor(fPos.index), inFrame: true, fontSize: fPos.fontSize!, fontColor: fPos.fontColor)
                                   ),
                                 )
                             
@@ -1128,14 +1130,21 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
           );
   }
 
-  Widget _buildTickers(double mediaHeight, List<String> tickerString, {Key? key, bool LtoR = false, bool inFrame = false, int fontSize = 0}) {
+  Widget _buildTickers(double mediaHeight, List<String> tickerString, {Key? key, bool LtoR = false, bool inFrame = false, int fontSize = 0, Color? fontColor = Colors.white}) {
     final percent = 0.10;
     double fontSizeInternal = mediaHeight * percent;
     if(fontSize != 0) {
       fontSizeInternal = fontSize.toDouble() * (mediaHeight * 0.01);
     }
-    const textColor = Colors.white;
-    const borderColor = Colors.black;
+
+    bool border = true;
+    Color textColor = Colors.white;
+    Color borderColor = Colors.black;
+    if(fontColor != null && fontColor != Colors.white) {
+      border = false;
+      textColor = fontColor;
+    }
+
     final borderWidth = fontSizeInternal * 0.12;
     final tickerSpeed = 1 * fontSizeInternal;
 
@@ -1144,9 +1153,9 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
       tickerString,
       tickerSpeed: tickerSpeed,
       tickerFontSize: fontSizeInternal,
-      tickerSymbol: '•',
+      tickerSymbol: '•-|-•',
       leftToRight: LtoR,
-      border: true,
+      border: border,
       borderColor: borderColor,
       borderWidth: borderWidth,
       textColor: textColor,
@@ -1203,7 +1212,6 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
     _frameTimer?.cancel();
     _reloadTimer?.cancel();
     unawaited(_connectivitySubscription?.cancel());
-    _controller?.dispose();
     _scheduleCheckTimer?.cancel();
     _payloadCheckTimer?.cancel();
     _tickerCheckTimer?.cancel();

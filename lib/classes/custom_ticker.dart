@@ -5,15 +5,14 @@ class CustomTicker extends StatefulWidget {
   const CustomTicker(
     this.textList, {
     super.key,
-    this.leftToRight = true,
+    this.leftToRight = false,
     this.tickerSymbol = '',
     this.tickerSpeed = 50.0,
     this.tickerFontSize = 14.0,
     this.border = false,
     this.borderColor = Colors.black,
     this.borderWidth = 0.0,
-    this.textColor = Colors.black,
-    this.lastWord = '',
+    this.textColor = Colors.white,
   });
 
   final List<String> textList;
@@ -25,9 +24,6 @@ class CustomTicker extends StatefulWidget {
   final bool border;
   final Color borderColor;
   final double borderWidth;
-
-  // Unused might be used in the future
-  final String lastWord;
 
   @override
   State<CustomTicker> createState() => _CustomTickerState();

@@ -22,6 +22,7 @@ class MediaDownloader {
     return directory;
   }
 
+  // Load ticker strings (Only custom tickers) when offline
   Future<List<String>?> loadSavedTickerStrings(String tickerId) async {
     final directory = await downloadDirectory;
     final file = File('${directory.path}/tickers/$tickerId.txt');
@@ -29,6 +30,7 @@ class MediaDownloader {
     return file.readAsLines();
   }
 
+  // Load frame coordinates when offline
   Future<Map<String, FrameCoordinates>> loadSavedFrameCoordinates() async {
     final directory = await downloadDirectory;
     final file = File('${directory.path}/json/frame_coordinates.json');
@@ -76,6 +78,7 @@ class MediaDownloader {
     return coordinates;
   }
 
+  // Save frame coordinates for offline usage
   Future<void> saveFrameCoordinates(
     Map<String, FrameCoordinates> coordinates,
   ) async {
@@ -99,6 +102,7 @@ class MediaDownloader {
     );
   }
 
+  // cleanup app directory for testing
   Future<void> cleanupAppDirectory() async {
     final directory = await downloadDirectory;
 
