@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
-import 'package:http/http.dart' as http;
+import 'package:flutter/material.dart';
+import 'package:flutter_video_test/classes/frame_ticker_position.dart';
 import 'package:xml/xml.dart';
 
 class ApiXmlHandler {
@@ -29,6 +30,74 @@ class ApiXmlHandler {
     return (x1, y1, x2, y2);
   }
 
+  // Get Ticker coordinates from XML file
+  Future<List<FrameTickerPosition>> getTickerCoordinates(String xmlString, String frameId) async {
+    final document = XmlDocument.parse(xmlString);
+
+    final textBlocks = document
+        .findAllElements('TextBlock');
+    
+    List<FrameTickerPosition> tickerPositions = [];
+
+    // For every TextBlock found in XML file
+    //   1. Get the Index
+    //   2. Get the position
+    //   3. Get the size
+    //   4. Get the fontsize
+    for(var block in textBlocks) {
+      final indexString = block
+          .findAllElements('TB_Index')
+          .map((element) => element.innerText);
+
+      final blockPos = block
+          .findAllElements('TB_BlockPosition')
+          .map((element) => element.innerText);
+      final blockSize = block
+          .findAllElements('TB_BlockSize')
+          .map((element) => element.innerText);
+
+      final fontSizeString = block
+          .findAllElements('TB_FontSize')
+          .map((element) => element.innerText);
+      
+      final fontColorString = block
+          .findAllElements('TB_FontColor')
+          .map((element) => element.innerText);
+      
+      final index = int.parse(indexString.first);
+
+      final posList = blockPos.first.split(';');
+      final sizeList = blockSize.first.split(';');
+
+      final x1 = int.parse(posList[0]);
+      final y1 = int.parse(posList[1]);
+      final x2 = int.parse(sizeList[0]) + x1;
+      final y2 = int.parse(sizeList[1]) + y1;
+
+      final fontSize = int.parse(fontSizeString.first);
+
+      final argbList = fontColorString.first.split(';');
+
+      final a = int.parse(argbList[0]);
+      final r = int.parse(argbList[1]);
+      final g = int.parse(argbList[2]);
+      final b = int.parse(argbList[3]);
+
+      tickerPositions.add(
+        FrameTickerPosition(
+          index: index, 
+          frameId: frameId, 
+          x1: x1, 
+          y1: y1, 
+          x2: x2, 
+          y2: y2,
+          fontSize: fontSize,
+          fontColor: Color.fromARGB(a, r, g, b)
+      ));
+    }
+    return tickerPositions;
+  }
+
   // Convert media given to xml string
   Future<String?> convertLinkToXMLString(String link) async {
     int index = link.lastIndexOf('.');
@@ -45,7 +114,7 @@ class ApiXmlHandler {
   }
 
   // Check if properties exist
-  bool checkPropertyExists(item) {
+  bool checkPropertyExists(dynamic item) {
     return item['properties'] != null;
   }
 
@@ -99,38 +168,89 @@ class ApiXmlHandler {
 
   // TICKERS
   Future<List<String>> getTickerStringFromXML(String xmlString, int amount) async{
-    xmlString = xmlString.replaceAll('|10|1', '');
+    // Remove | data from string
+    List<dynamic> strings = xmlString.split('|');
     List<String> tickerStrings = [];
     int limit = amount;
     int count = 0;
 
+    xmlString = strings[0];
+    int type = 0;
+    // Check if there's | data in string
+    if(strings.length > 1)
+    {
+      type = int.parse(strings[2]);
+    }
+
+    // Use Relay server to avoid CORS
+    String bcmString = 'https://rssrelay-strato.bcmserver.com/?url=$xmlString';
+
     try {
       final response = await _dio.get<String>(
-        xmlString,
-        options: Options(responseType: ResponseType.plain),
+        bcmString,
+        options: Options(
+          responseType: ResponseType.plain,
+        )
       );
 
       final xmlContent = response.data!;
 
       final document = XmlDocument.parse(xmlContent);
 
-      print('test');
       final items = document
           .findAllElements('item');
-          // .map((element) => element);
       
+      // For every item in XML file
+      // // 1. Find the title and add it to list
+      // // 3. Find the title and description and add it to list
       for (var item in items) {
         if (count >= limit) {
           break;
         }
         count++;
         
-        final title = item.findElements('title').single.innerText;
+        switch (type) {
+          case 1:
+            final title = item.findElements('title').single.innerText.trim();
 
-        print('$count: Title: $title');
-        tickerStrings.add(title);
+            print('$count: Title: $title');
+            tickerStrings.add(title);
+            continue;
+          case 2:
+
+            continue;
+          case 3:
+            final title = item.findElements('title').single.innerText.trim();
+            String description = item.findElements('description').single.innerText.trim();
+
+            // Remove HTML from string
+            RegExp expHTML = RegExp(r'(<a[^>]*>.*<\/a[^>]*>)|(<[^>]*>)');
+            description = description.replaceAll(expHTML, ' ');
+
+            // Remove double spaces from string
+            RegExp expSpaces = RegExp(r'\ \ +');
+            description = description.replaceAll(expSpaces, ' ');
+
+            print('$count: Title: $title');
+            print('$count: Description: $description');
+
+            String tickerString = '$title - $description';
+            tickerStrings.add(tickerString);
+
+            continue;
+          default:
+            final title = item.findElements('title').single.innerText.trim();
+
+            print('$count: Title: $title');
+            tickerStrings.add(title);
+        }
       }
+      print('-------------------------------------------');
       return tickerStrings;
+    } on DioException catch (e) {
+      print('HTTP STATUS: ${e.response?.statusCode}');
+      print('RESPONSE: ${e.response?.data}');
+      print('HEADERS: ${e.response?.headers}');
     } catch (e) {
       print('Error fetching or parsing XML tickers: $e');
     }

@@ -5,15 +5,14 @@ class CustomTicker extends StatefulWidget {
   const CustomTicker(
     this.textList, {
     super.key,
-    this.leftToRight = true,
+    this.leftToRight = false,
     this.tickerSymbol = '',
     this.tickerSpeed = 50.0,
     this.tickerFontSize = 14.0,
     this.border = false,
     this.borderColor = Colors.black,
     this.borderWidth = 0.0,
-    this.textColor = Colors.black,
-    this.lastWord = '',
+    this.textColor = Colors.white,
   });
 
   final List<String> textList;
@@ -25,9 +24,6 @@ class CustomTicker extends StatefulWidget {
   final bool border;
   final Color borderColor;
   final double borderWidth;
-
-  // Unused might be used in the future
-  final String lastWord;
 
   @override
   State<CustomTicker> createState() => _CustomTickerState();
@@ -42,9 +38,8 @@ class _CustomTickerState extends State<CustomTicker>
   late List<String> oldTextList;
 
   // Join all tickers together with symbol
-  String get _tickerText => widget.textList
-      .map((text) => '${widget.tickerSymbol} $text')
-      .join(' ');
+  String get _tickerText =>
+      widget.textList.map((text) => '${widget.tickerSymbol} $text').join(' ');
 
   // Regular text style for the ticker
   TextStyle get _textStyle => TextStyle(
@@ -135,7 +130,7 @@ class _CustomTickerState extends State<CustomTicker>
     final inheritedStyle = DefaultTextStyle.of(context).style;
     final style = inheritedStyle.merge(_textStyle);
     final borderStyle = inheritedStyle.merge(_borderTextStyle);
-    
+
     final textDirection = Directionality.of(context);
     // Measure the text so copies fit edge-to-edge and the viewport can fit its line box.
     final textPainter = TextPainter(
@@ -168,7 +163,7 @@ class _CustomTickerState extends State<CustomTicker>
         final textEndPadding = widget.tickerFontSize * 0.25 + borderPadding * 2;
         final renderedTextWidth = textWidth + textEndPadding;
         // Keep the next copy far enough away that it cannot overlap the last word.
-        // For some reason tickerGap not being variable makes it give error, 
+        // For some reason tickerGap not being variable makes it give error,
         //  so I made it as small as possible.
         final tickerGap = borderPadding / 10;
         final tickerWidth = renderedTextWidth + tickerGap + borderPadding * 2;

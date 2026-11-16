@@ -2,6 +2,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_video_test/classes/frame_link.dart';
 import 'package:flutter_video_test/classes/media_link.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
+import 'package:flutter_video_test/classes/ticker_link.dart';
 
 import 'dart:developer';
 import 'dart:js_interop';
@@ -101,6 +102,18 @@ class MediaCacher {
               y1: media.y1,
               x2: media.x2,
               y2: media.y2,
+              frameTickerPositions: media.frameTickerPositions,
+            ),
+          );
+          break;
+        case 'ticker':
+          downloadedLinks.add(
+            TickerLink(
+              id: media.id,
+              link: media.link,
+              type: media.type,
+              creationType: media.creationType,
+              tickerStrings: media.tickerStrings
             ),
           );
           break;

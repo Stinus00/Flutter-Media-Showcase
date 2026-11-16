@@ -5,21 +5,21 @@ import 'dart:math' as math;
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_video_test/classes/custom_ticker.dart';
-import 'package:flutter_video_test/classes/frame_link.dart';
-import 'package:flutter_video_test/cache_download/media_cacher_stub.dart'
-    if (dart.library.js_interop) 'package:flutter_video_test/cache_download/media_cacher.dart';
-import 'package:flutter_video_test/app_download/media_downloader.dart';
-import 'package:flutter_video_test/classes/ticker_link.dart';
+import 'package:flutter_video_test/classes/frame_ticker_position.dart';
 import 'package:video_player/video_player.dart';
 import 'package:video_player_media_kit/video_player_media_kit.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
-import 'sources/ticker_sources.dart';
 import 'classes/media_link.dart';
+import 'classes/frame_link.dart';
+import 'classes/ticker_link.dart';
+import 'classes/custom_ticker.dart';
+
 import 'api/api_call.dart';
 import 'cache_download/page_reloader_stub.dart'
     if (dart.library.js_interop) 'cache_download/page_reloader.dart';
+import 'cache_download/media_cacher_stub.dart'
+    if (dart.library.js_interop) 'cache_download/media_cacher.dart';
 
 void main() => runApp(const VideoApp());
 
@@ -33,15 +33,18 @@ class VideoApp extends StatefulWidget {
 class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
   final MediaCacher _mediaCacher = MediaCacher();
   final ApiCall _apiCall = ApiCall();
-  final MediaDownloader _mediaDownloader = MediaDownloader();
 
   // Lists.
   List<MediaLink> _mediaLinks = [];
   List<FrameLink> _frameLinks = [];
-  List<TickerLink> _tickerLinks = [];
+  List<TickerLink> _tickerLinksMain = [];
+  List<TickerLink> _tickerLinksSecondary = [];
+  List<String> tickerMain = []; // String with all ticker titles
+  List<String> tickerSecondary = [];
+  final Map<int, GlobalKey> _tickerKeys = {};
 
-  // Testing
-  bool _initialPlaylistActive = true;
+  GlobalKey _tickerKeyFor(int index) =>
+      _tickerKeys.putIfAbsent(index, GlobalKey.new);
 
   // Media Paths
   String? _imagePath;
@@ -68,12 +71,12 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
   int _currentLinkIndexFrame = 0;
   int? _videoErrorIndex;
   FrameLink? _frameErrorPending;
+
   // Check API timers
   Timer? _scheduleCheckTimer;
   Timer? _payloadCheckTimer;
-  StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
-  bool? _hasNetworkConnection;
-  int _connectivityRevision = 0;
+  Timer? _tickerCheckTimer;
+
   // Check API booleans
   bool _checkSchedule = false;
   bool _checkPayload = false;
@@ -87,12 +90,18 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
   double? y2;
   String? creationType;
 
+  // Ticker coordinates
+  List<FrameTickerPosition> frameTickerPositions = [];
+
+  // Check internet connection
+  StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
+  bool? _hasNetworkConnection;
+  int _connectivityRevision = 0;
+
   MediaLink? get _currentMedia =>
       _mediaLinks.isEmpty ? null : _mediaLinks[_currentLinkIndex];
   FrameLink? get _currentMediaFrame =>
       _frameLinks.isEmpty ? null : _frameLinks[_currentLinkIndexFrame];
-
-  List<String> allTickers = [];
 
   @override
   void initState() {
@@ -158,6 +167,7 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
 
   // Download the media given and initialize the first media.
   Future<void> _prepareMedia({bool startChangeChecks = false}) async {
+
     try {
       if (_mediaLinks.isEmpty) {
         _mediaLinks = await _apiCall.getMediaFromApi();
@@ -165,14 +175,17 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
       if (_frameLinks.isEmpty) {
         _frameLinks = await _apiCall.getFrameLinksFromApi();
       }
-      if(_tickerLinks.isEmpty) {
-        _tickerLinks = await _apiCall.getTickerLinksFromApi();
-      }
 
-      for(final ticker in _tickerLinks) {
-        allTickers += ticker.tickerStrings;
-      }
+      List<TickerLink> tickerLinksOne = [];
+      List<TickerLink> tickerLinksTwo = [];
 
+      if(_tickerLinksMain.isEmpty) {
+        (tickerLinksOne, tickerLinksTwo) = await _apiCall.getTickerLinksFromApi();
+      }
+      _tickerLinksMain = tickerLinksOne;
+      _tickerLinksSecondary = tickerLinksTwo;
+
+      _updateTickers();
 
       _isPreparingMedia = false;
       if (mounted) setState(() {});
@@ -183,12 +196,24 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
       }
     } catch (error) {
       if (!mounted) return;
+      if (startChangeChecks) {
+        _startChangeChecks();
+      }
       if (!kIsWeb) {
-        final cachedMedia = await _mediaDownloader.loadDownloadedMedia();
-        final cachedFrames = await _mediaDownloader.loadDownloadedFrames();
-        if (cachedMedia.isNotEmpty) {
-          _mediaLinks = cachedMedia;
-          _frameLinks = cachedFrames;
+        final cached = await _apiCall.loadSavedApiMedia();
+        if (cached.media.isNotEmpty) {
+          _mediaLinks = cached.media;
+          _frameLinks = cached.frames;
+          List<TickerLink> tickerLinksOne = [];
+          List<TickerLink> tickerLinksTwo = [];
+
+          (tickerLinksOne, tickerLinksTwo) = cached.tickers;
+
+          _tickerLinksMain = tickerLinksOne;
+          _tickerLinksSecondary = tickerLinksTwo;
+          tickerMain = tickerLinksOne
+              .expand((ticker) => ticker.tickerStrings)
+              .toList();
           _isPreparingMedia = false;
           _preloadError = null;
           if (mounted) setState(() {});
@@ -208,11 +233,13 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
   // Start timers
   // // 1 minute for checking if schedules changed
   // // 15 minutes for checking if api changed
+  // // 10 minutes for checking if ticker sources have changed media
   void _startChangeChecks() {
     _scheduleCheckTimer?.cancel();
     _payloadCheckTimer?.cancel();
+    _tickerCheckTimer?.cancel();
 
-    _scheduleCheckTimer ??= Timer.periodic(const Duration(minutes: 1), (_) {
+    _scheduleCheckTimer ??= Timer.periodic(const Duration(minutes: 1), (_) { // Check if schedules have changed
       if (_mediaLinks.isEmpty) {
         setState(() {
           _preloadError = null;
@@ -224,15 +251,35 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
         });
       }
     });
-    _payloadCheckTimer ??= Timer.periodic(const Duration(minutes: 15), (_) {
-      if (_mediaLinks.isEmpty) {
+    _payloadCheckTimer ??= Timer.periodic(const Duration(minutes: 15), (_) { // Check if API callback has changed
+      if(_hasNetworkConnection == true) {
+        if (_mediaLinks.isEmpty) {
+          setState(() {
+            _preloadError = null;
+          });
+          unawaited(_checkForMediaChanges(checkPayload: true));
+        } else {
+          setState(() {
+            _checkPayload = true;
+          });
+        }
+      }
+    });
+    _tickerCheckTimer ??= Timer.periodic(const Duration(minutes: 10), (_) async { // Check if tickersources have changed
+      if(_hasNetworkConnection == true) {
+        final updatedTickerLinks = await _apiCall
+            .rebuildTickersForCurrentSchedules(now: DateTime.now());
+        
+        List<TickerLink> tickerLinksOne = [];
+        List<TickerLink> tickerLinksTwo = [];
+
+        (tickerLinksOne, tickerLinksTwo) = updatedTickerLinks;
+
+        if (!mounted) return;
         setState(() {
-          _preloadError = null;
-        });
-        unawaited(_checkForMediaChanges(checkPayload: true));
-      } else {
-        setState(() {
-          _checkPayload = true;
+          _tickerLinksMain = tickerLinksOne;
+          _tickerLinksSecondary = tickerLinksTwo;
+          _updateTickers();
         });
       }
     });
@@ -248,15 +295,16 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
     }
     _isCheckingForChanges = true;
     try {
-      final payloadChanged = checkPayload
+      final payloadChanged = checkPayload == true // Check if callback has changed
           ? await _apiCall.hasPayloadChanged()
           : false;
-      final schedulesChanged = _apiCall.haveSchedulesChanged();
+      final schedulesChanged = _apiCall.haveSchedulesChanged(); // Check if changes in schedule
       if (!payloadChanged && !schedulesChanged) {
         await _apiCall.cleanupStoredMedia();
         return;
       }
 
+      // Rebuild all media
       final updatedMediaLinks = await _apiCall
           .rebuildMediaForCurrentSchedules();
       final updatedFrameLinks = await _apiCall
@@ -264,6 +312,7 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
       final updatedTickerLinks = await _apiCall
           .rebuildTickersForCurrentSchedules();
     
+      // Clear everything for future use
       _isChangingVideo = true;
       _imageTimer?.cancel();
       _imageTimer = null;
@@ -282,12 +331,16 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
 
       _mediaLinks = updatedMediaLinks;
       _frameLinks = updatedFrameLinks;
-      _tickerLinks = updatedTickerLinks;
 
-      allTickers = [];
-      for(final ticker in _tickerLinks) {
-        allTickers += ticker.tickerStrings;
-      }
+      List<TickerLink> tickerLinksOne = [];
+      List<TickerLink> tickerLinksTwo = [];
+
+      (tickerLinksOne, tickerLinksTwo) = updatedTickerLinks;
+
+      _tickerLinksMain = tickerLinksOne;
+      _tickerLinksSecondary = tickerLinksTwo;
+
+      _updateTickers();
 
       await _initializeMedia();
       await _initializeFrame();
@@ -416,6 +469,18 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
     x2 = frame?.x2;
     y2 = frame?.y2;
     creationType = frame?.creationType;
+    frameTickerPositions = frame?.frameTickerPositions ?? [];
+  }
+
+  void _updateTickers() {
+    tickerMain = [];
+    for(final ticker in _tickerLinksMain) {
+      tickerMain += ticker.tickerStrings;
+    }
+    tickerSecondary = [];
+    for(final ticker in _tickerLinksSecondary) {
+      tickerSecondary += ticker.tickerStrings;
+    }
   }
 
   // Handle video state changes
@@ -634,14 +699,16 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
     _videoErrorIndex = null;
     _imageError = null;
     _imagePath = null;
-    _isChangingVideo = false;
     setState(() {});
 
     await controller?.dispose();
     controller = null;
     await _evictActiveImage();
     await _checkPendingMediaChanges();
-    _handleVideoState();
+    _isChangingVideo = false;
+    if (mounted) {
+      _handleVideoState();
+    }
   }
 
   // Play next image.
@@ -779,6 +846,31 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
                             ),
                           ),
                           if (creationType == 'bcm') _buildMediaFrame(),
+                          if (frameTickerPositions.isNotEmpty)
+                            for (var fPos in frameTickerPositions)
+                              if (fPos.index == 1) 
+                                Positioned(
+                                  key: ValueKey(fPos.index),
+                                  left: fPos.x1 * scale,
+                                  top: fPos.y1 * scale,
+                                  width: (fPos.x2 - fPos.x1) * scale,
+                                  height: (fPos.y2 - fPos.y1) * scale,
+                                  child: ClipRect(
+                                    child: _buildTickers((fPos.y2 - fPos.y1) * scale, tickerMain, key: _tickerKeyFor(fPos.index), inFrame: true, fontSize: fPos.fontSize!, fontColor: fPos.fontColor)
+                                  ),
+                                )
+                              else
+                                Positioned(
+                                  key: ValueKey(fPos.index),
+                                  left: fPos.x1 * scale,
+                                  top: fPos.y1 * scale,
+                                  width: (fPos.x2 - fPos.x1) * scale,
+                                  height: (fPos.y2 - fPos.y1) * scale,
+                                  child: ClipRect(
+                                    child: _buildTickers((fPos.y2 - fPos.y1) * scale, tickerSecondary, key: _tickerKeyFor(fPos.index), inFrame: true, fontSize: fPos.fontSize!, fontColor: fPos.fontColor)
+                                  ),
+                                )
+                            
                         ],
                       ),
                     ),
@@ -837,18 +929,37 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
       alignment: Alignment.bottomCenter,
       children: [
         _buildMediaContent(),
-        Positioned(
-          left: 0,
-          right: 0,
-          bottom: -5,
-          child: _buildTickers(mediaHeight, false),
-        ),
-        Positioned(
-          left: 0,
-          right: 0,
-          top: 0,
-          child: _buildTickers(mediaHeight, true),
-        ),
+        if (frameTickerPositions.isEmpty) ...[
+          Positioned(
+            key: ValueKey(1),
+            left: 0,
+            right: 0,
+            bottom: -5,
+            child: _buildTickers(mediaHeight, tickerMain, key: _tickerKeyFor(1)),
+          ),
+          Positioned(
+            key: ValueKey(0),
+            left: 0,
+            right: 0,
+            top: 0,
+            child: _buildTickers(mediaHeight, tickerSecondary, key: _tickerKeyFor(2)),
+          ),
+        ]
+        else if (frameTickerPositions.length == 1 &&
+            tickerSecondary.isNotEmpty)
+          Positioned(
+            key: ValueKey(0),
+            left: 0,
+            right: 0,
+            bottom: 5,
+            child: _buildTickers(
+              mediaHeight,
+              tickerSecondary,
+              key: _tickerKeyFor(
+                frameTickerPositions.single.index == 1 ? 2 : -1,
+              ),
+            ),
+          ),
       ],
     );
   }
@@ -1019,21 +1130,32 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
           );
   }
 
-  Widget _buildTickers(double mediaHeight, bool backwards) {
+  Widget _buildTickers(double mediaHeight, List<String> tickerString, {Key? key, bool LtoR = false, bool inFrame = false, int fontSize = 0, Color? fontColor = Colors.white}) {
     final percent = 0.10;
-    final fontSize = mediaHeight * percent;
-    const textColor = Colors.white;
-    const borderColor = Colors.black;
-    final borderWidth = fontSize * 0.1;
-    final tickerSpeed = 1 * fontSize * 1;
+    double fontSizeInternal = mediaHeight * percent;
+    if(fontSize != 0) {
+      fontSizeInternal = fontSize.toDouble() * (mediaHeight * 0.01);
+    }
+
+    bool border = true;
+    Color textColor = Colors.white;
+    Color borderColor = Colors.black;
+    if(fontColor != null && fontColor != Colors.white) {
+      border = false;
+      textColor = fontColor;
+    }
+
+    final borderWidth = fontSizeInternal * 0.12;
+    final tickerSpeed = 1 * fontSizeInternal;
 
     return CustomTicker(
-      allTickers,
+      key: key,
+      tickerString,
       tickerSpeed: tickerSpeed,
-      tickerFontSize: fontSize,
-      tickerSymbol: '•',
-      leftToRight: backwards,
-      border: true,
+      tickerFontSize: fontSizeInternal,
+      tickerSymbol: '•-|-•',
+      leftToRight: LtoR,
+      border: border,
       borderColor: borderColor,
       borderWidth: borderWidth,
       textColor: textColor,
@@ -1090,9 +1212,9 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
     _frameTimer?.cancel();
     _reloadTimer?.cancel();
     unawaited(_connectivitySubscription?.cancel());
-    _controller?.dispose();
     _scheduleCheckTimer?.cancel();
     _payloadCheckTimer?.cancel();
+    _tickerCheckTimer?.cancel();
     var controller = _controller;
     unawaited(() async {
       await controller?.dispose();
