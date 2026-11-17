@@ -10,12 +10,14 @@ class ActivityMonitor extends StatefulWidget {
     required this.onVisibilityChanged,
     required this.nextPlaylistButtonFocusNode,
     required this.settingsButtonFocusNode,
+    required this.isSettingsOpen,
   });
 
   final Widget child;
   final ValueChanged<bool> onVisibilityChanged;
   final FocusNode nextPlaylistButtonFocusNode;
   final FocusNode settingsButtonFocusNode;
+  final bool isSettingsOpen;
 
   @override
   State<ActivityMonitor> createState() => _ActivityMonitorState();
@@ -59,6 +61,8 @@ class _ActivityMonitorState extends State<ActivityMonitor> {
     return Focus(
       autofocus: true,
       onKeyEvent: (node, event) {
+        if (widget.isSettingsOpen) return KeyEventResult.ignored;
+
         final isArrowKey =
             event.logicalKey == LogicalKeyboardKey.arrowUp ||
             event.logicalKey == LogicalKeyboardKey.arrowDown ||
@@ -66,7 +70,7 @@ class _ActivityMonitorState extends State<ActivityMonitor> {
             event.logicalKey == LogicalKeyboardKey.arrowRight;
         if (isArrowKey &&
             (event is KeyDownEvent || event is KeyRepeatEvent)) {
-          final wasHidden = _buttonsVisible;
+          final wasHidden = !_buttonsVisible;
           _updateActivity();
           if (wasHidden) {
             WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -84,7 +88,7 @@ class _ActivityMonitorState extends State<ActivityMonitor> {
               !widget.nextPlaylistButtonFocusNode.hasFocus) {
             widget.settingsButtonFocusNode.requestFocus();
           } else {
-            return KeyEventResult.handled;
+            return KeyEventResult.ignored;
           }
           return KeyEventResult.handled;
         }

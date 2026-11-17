@@ -843,6 +843,7 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
             return ActivityMonitor(
               nextPlaylistButtonFocusNode: _nextPlaylistButtonFocusNode,
               settingsButtonFocusNode: _settingsButtonFocusNode,
+              isSettingsOpen: _showSettings,
               onVisibilityChanged: (visible) {
                 if (_showButtons == visible) return;
                 setState(() {
@@ -1243,7 +1244,8 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
         key: const ValueKey('next-playlist-button'),
         focusNode: _nextPlaylistButtonFocusNode,
         backgroundColor: const Color.fromARGB(98, 59, 128, 255),
-        hoverColor: const Color.fromARGB(97, 45, 119, 255),
+        focusColor: const Color.fromARGB(95, 122, 169, 255),
+        hoverColor: const Color.fromARGB(95, 122, 169, 255),
         foregroundColor: Colors.white,
         elevation: 0,
         onPressed: () {
@@ -1278,7 +1280,8 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
         key: const ValueKey('settings-button'),
         focusNode: _settingsButtonFocusNode,
         backgroundColor: const Color.fromARGB(98, 59, 128, 255),
-        hoverColor: const Color.fromARGB(97, 45, 119, 255),
+        focusColor: const Color.fromARGB(95, 122, 169, 255),
+        hoverColor: const Color.fromARGB(95, 122, 169, 255),
         foregroundColor: Colors.white,
         elevation: 0,
         onPressed: () {
