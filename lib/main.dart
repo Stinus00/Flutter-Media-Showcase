@@ -5,8 +5,9 @@ import 'dart:math' as math;
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_video_test/classes/frame_ticker_position.dart';
+import 'package:flutter_video_test/widgets/activity_monitor.dart';
+import 'package:flutter_video_test/widgets/floating_settings_box.dart';
 import 'package:video_player/video_player.dart';
 import 'package:video_player_media_kit/video_player_media_kit.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
@@ -63,7 +64,6 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
   Timer? _imageTimer;
   Timer? _frameTimer;
   Timer? _reloadTimer;
-  Timer? _showSettingsTimer;
   ImageProvider? _activeImageProvider;
 
   // Errors
@@ -75,6 +75,8 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
   bool _isChangingVideo = false;
   bool _isSkippingMedia = false;
   bool _isPreparingMedia = true;
+  bool _showButtons = true;
+  bool _showSettings = false;
   int _currentLinkIndex = 0;
   int _currentLinkIndexFrame = 0;
   int? _videoErrorIndex;
@@ -110,11 +112,6 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
       _mediaLinks.isEmpty ? null : _mediaLinks[_currentLinkIndex];
   FrameLink? get _currentMediaFrame =>
       _frameLinks.isEmpty ? null : _frameLinks[_currentLinkIndexFrame];
-
-  // Test
-  double x = 0.0;
-  double y = 0.0;
-  bool _hideSettings = false;
 
   @override
   void initState() {
@@ -303,17 +300,6 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
     });
   }
 
-  void _startIdleTimer() {
-    _showSettingsTimer?.cancel();
-    _showSettingsTimer = Timer(const Duration(seconds: 10), () {
-      if (!mounted) return;
-      setState(() {
-        _hideSettings = true;
-      });
-      print('showSettings');
-    });
-  }
-
   // Check if there's any changes in api or schedules
   // Clear everything if there are changes.
   Future<void> _checkForMediaChanges({bool checkPayload = false}) async {
@@ -427,7 +413,6 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
       if (!mounted) return;
       setState(() {});
       _startImageTimer(media);
-      _startIdleTimer();
       return;
     }
 
@@ -842,13 +827,6 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
   // Widget to display the appf
   @override
   Widget build(BuildContext context) {
-    void updateSettings() {
-      _startIdleTimer();
-      setState(() {
-        _hideSettings = false;
-      });
-    }
-
     return MaterialApp(
       title: 'Video Demo',
       theme: ThemeData(scaffoldBackgroundColor: Colors.black),
@@ -862,157 +840,131 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
               constraints.maxHeight / canvasHeight,
             );
 
-            return Focus(
-              autofocus: true,
-              onKeyEvent: (node, event) {
-                final isArrowKey =
-                    event.logicalKey == LogicalKeyboardKey.arrowUp ||
-                    event.logicalKey == LogicalKeyboardKey.arrowDown ||
-                    event.logicalKey == LogicalKeyboardKey.arrowLeft ||
-                    event.logicalKey == LogicalKeyboardKey.arrowRight;
-                if (isArrowKey &&
-                    (event is KeyDownEvent || event is KeyRepeatEvent)) {
-                  final wasHidden = _hideSettings;
-                  updateSettings();
-                  if (wasHidden) {
-                    WidgetsBinding.instance.addPostFrameCallback((_) {
-                      if (mounted) {
-                        _nextPlaylistButtonFocusNode.requestFocus();
-                      }
-                    });
-                  } else if (_settingsButtonFocusNode.hasFocus &&
-                      event.logicalKey == LogicalKeyboardKey.arrowDown) {
-                    _nextPlaylistButtonFocusNode.requestFocus();
-                  } else if (_nextPlaylistButtonFocusNode.hasFocus &&
-                      event.logicalKey == LogicalKeyboardKey.arrowUp) {
-                    _settingsButtonFocusNode.requestFocus();
-                  } else if (!_settingsButtonFocusNode.hasFocus &&
-                      !_nextPlaylistButtonFocusNode.hasFocus) {
-                    _nextPlaylistButtonFocusNode.requestFocus();
-                  } else {
-                    return KeyEventResult.handled;
-                  }
-                  return KeyEventResult.handled;
-                }
-                return KeyEventResult.ignored;
+            return ActivityMonitor(
+              nextPlaylistButtonFocusNode: _nextPlaylistButtonFocusNode,
+              settingsButtonFocusNode: _settingsButtonFocusNode,
+              onVisibilityChanged: (visible) {
+                if (_showButtons == visible) return;
+                setState(() {
+                  _showButtons = visible;
+                });
               },
-              child: MouseRegion(
-                onHover: (event) => updateSettings(),
-                child: GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTapDown: (details) => updateSettings(),
-                  child: Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      // Check if there's frame coordinates.
-                      // // If there is build frame and put media inside frame.
-                      // // If there isn't just build media.
-                      if (x1 != null)
-                        Center(
-                          child: SizedBox(
-                            width: canvasWidth * scale,
-                            height: canvasHeight * scale,
-                            child: Stack(
-                              children: [
-                                _buildMediaFrame(),
-                                Positioned(
-                                  left: x1! * scale,
-                                  top: y1! * scale,
-                                  width: (x2! - x1!) * scale,
-                                  height: (y2! - y1!) * scale,
-                                  child: ClipRect(
-                                    child: _buildMedia((y2! - y1!) * scale),
-                                  ),
-                                ),
-                                if (creationType == 'bcm') _buildMediaFrame(),
-                                if (frameTickerPositions.isNotEmpty)
-                                  for (var fPos in frameTickerPositions)
-                                    if (fPos.index == 1)
-                                      Positioned(
-                                        key: ValueKey(fPos.index),
-                                        left: fPos.x1 * scale,
-                                        top: fPos.y1 * scale,
-                                        width: (fPos.x2 - fPos.x1) * scale,
-                                        height: (fPos.y2 - fPos.y1) * scale,
-                                        child: ClipRect(
-                                          child: _buildTickers(
-                                            (fPos.y2 - fPos.y1) * scale,
-                                            tickerMain,
-                                            key: _tickerKeyFor(fPos.index),
-                                            inFrame: true,
-                                            fontSize: fPos.fontSize!,
-                                            fontColor: fPos.fontColor,
-                                          ),
-                                        ),
-                                      )
-                                    else
-                                      Positioned(
-                                        key: ValueKey(fPos.index),
-                                        left: fPos.x1 * scale,
-                                        top: fPos.y1 * scale,
-                                        width: (fPos.x2 - fPos.x1) * scale,
-                                        height: (fPos.y2 - fPos.y1) * scale,
-                                        child: ClipRect(
-                                          child: _buildTickers(
-                                            (fPos.y2 - fPos.y1) * scale,
-                                            tickerSecondary,
-                                            key: _tickerKeyFor(fPos.index),
-                                            inFrame: true,
-                                            fontSize: fPos.fontSize!,
-                                            fontColor: fPos.fontColor,
-                                          ),
-                                        ),
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  // Check if there's frame coordinates.
+                  // // If there is build frame and put media inside frame.
+                  // // If there isn't just build media.
+                  if (x1 != null)
+                    Center(
+                      child: SizedBox(
+                        width: canvasWidth * scale,
+                        height: canvasHeight * scale,
+                        child: Stack(
+                          children: [
+                            _buildMediaFrame(),
+                            Positioned(
+                              left: x1! * scale,
+                              top: y1! * scale,
+                              width: (x2! - x1!) * scale,
+                              height: (y2! - y1!) * scale,
+                              child: ClipRect(
+                                child: _buildMedia((y2! - y1!) * scale),
+                              ),
+                            ),
+                            if (creationType == 'bcm') _buildMediaFrame(),
+                            if (frameTickerPositions.isNotEmpty)
+                              for (var fPos in frameTickerPositions)
+                                if (fPos.index == 1)
+                                  Positioned(
+                                    key: ValueKey(fPos.index),
+                                    left: fPos.x1 * scale,
+                                    top: fPos.y1 * scale,
+                                    width: (fPos.x2 - fPos.x1) * scale,
+                                    height: (fPos.y2 - fPos.y1) * scale,
+                                    child: ClipRect(
+                                      child: _buildTickers(
+                                        (fPos.y2 - fPos.y1) * scale,
+                                        tickerMain,
+                                        key: _tickerKeyFor(fPos.index),
+                                        inFrame: true,
+                                        fontSize: fPos.fontSize!,
+                                        fontColor: fPos.fontColor,
                                       ),
-                              ],
+                                    ),
+                                  )
+                                else
+                                  Positioned(
+                                    key: ValueKey(fPos.index),
+                                    left: fPos.x1 * scale,
+                                    top: fPos.y1 * scale,
+                                    width: (fPos.x2 - fPos.x1) * scale,
+                                    height: (fPos.y2 - fPos.y1) * scale,
+                                    child: ClipRect(
+                                      child: _buildTickers(
+                                        (fPos.y2 - fPos.y1) * scale,
+                                        tickerSecondary,
+                                        key: _tickerKeyFor(fPos.index),
+                                        inFrame: true,
+                                        fontSize: fPos.fontSize!,
+                                        fontColor: fPos.fontColor,
+                                      ),
+                                    ),
+                                  ),
+                          ],
+                        ),
+                      ),
+                    )
+                  else
+                    Center(child: _buildMedia(canvasHeight * scale)),
+                  if (_showButtons)
+                    Positioned(
+                      right: 16,
+                      bottom: 16,
+                      child: _buildNextPlaylistButton(),
+                    ),
+                  if (_showButtons)
+                    Positioned(
+                      right: 16,
+                      top: 16,
+                      child: _buildSettingsButton(),
+                    ),
+                  if(_showSettings)
+                    FloatingSettingsBox(onCloseSettings: () {
+                      setState(() {
+                        _showSettings = false;
+                      }); 
+                    }),
+                  if (_hasNetworkConnection == false)
+                    Align(
+                      alignment: Alignment.topLeft,
+                      child: Stack(
+                        alignment: Alignment.topLeft,
+                        children: [
+                          // White silhouette behind the original transparent image
+                          Transform.translate(
+                            offset: const Offset(-2.5, -2.5),
+                            child: ColorFiltered(
+                              colorFilter: const ColorFilter.mode(
+                                Colors.black,
+                                BlendMode.srcIn,
+                              ),
+                              child: Image.asset(
+                                'assets/no-internet.png',
+                                width: 85,
+                              ),
                             ),
                           ),
-                        )
-                      else
-                        Center(child: _buildMedia(canvasHeight * scale)),
-                      if (!_hideSettings)
-                        Positioned(
-                          right: 16,
-                          bottom: 16,
-                          child: _buildNextPlaylistButton(),
-                        ),
-                      if (!_hideSettings)
-                        Positioned(
-                          right: 16,
-                          top: 16,
-                          child: _buildSettingsButton(),
-                        ),
-                      if (_hasNetworkConnection == false)
-                        Align(
-                          alignment: Alignment.topLeft,
-                          child: Stack(
-                            alignment: Alignment.topLeft,
-                            children: [
-                              // White silhouette behind the original transparent image
-                              Transform.translate(
-                                offset: const Offset(-2.5, -2.5),
-                                child: ColorFiltered(
-                                  colorFilter: const ColorFilter.mode(
-                                    Colors.black,
-                                    BlendMode.srcIn,
-                                  ),
-                                  child: Image.asset(
-                                    'assets/no-internet.png',
-                                    width: 85,
-                                  ),
-                                ),
-                              ),
 
-                              Image.asset(
-                                'assets/no-internet.png',
-                                width: 80,
-                                color: Colors.red,
-                              ),
-                            ],
+                          Image.asset(
+                            'assets/no-internet.png',
+                            width: 80,
+                            color: Colors.red,
                           ),
-                        ),
-                    ],
-                  ),
-                ),
+                        ],
+                      ),
+                    ),
+                ],
               ),
             );
           },
@@ -1330,7 +1282,9 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
         foregroundColor: Colors.white,
         elevation: 0,
         onPressed: () {
-          print('banana');
+          setState(() {
+            _showSettings = true;
+          });
         },
         icon: const Icon(Icons.play_arrow),
         label: const Text('Settings'),
@@ -1353,7 +1307,6 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
     _imageTimer?.cancel();
     _frameTimer?.cancel();
     _reloadTimer?.cancel();
-    _showSettingsTimer?.cancel();
     _nextPlaylistButtonFocusNode.dispose();
     _settingsButtonFocusNode.dispose();
     unawaited(_connectivitySubscription?.cancel());
