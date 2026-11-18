@@ -23,9 +23,13 @@ class _FloatingSettingsBoxState extends State<FloatingSettingsBox> {
   final _formKey = GlobalKey<FormState>();
   final FocusScopeNode _settingsFocusScope = FocusScopeNode();
   final FocusNode _settingsMenuFocusNode = FocusNode();
+  //unused
   final FocusNode _emailFocusNode = FocusNode();
+  //unused
   final FocusNode _passwordFocusNode = FocusNode();
   final FocusNode _codeFocusNode = FocusNode();
+  final FocusNode _mccId1FocusNode = FocusNode();
+  final FocusNode _mccId2FocusNode = FocusNode();
   final FocusNode _submitFocusNode = FocusNode();
   final FocusNode _cancelFocusNode = FocusNode();
 
@@ -36,7 +40,7 @@ class _FloatingSettingsBoxState extends State<FloatingSettingsBox> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _settingsFocusScope.requestFocus(_emailFocusNode);
+      if (mounted) _settingsFocusScope.requestFocus(_codeFocusNode);
     });
   }
 
@@ -45,12 +49,15 @@ class _FloatingSettingsBoxState extends State<FloatingSettingsBox> {
     required String hintText,
     required TextInputTypeCustom type,
     required FocusNode focusNode,
+    bool capitalize = false,
     bool obscureText = false,
     String obscureCharacter = '*',
     String validatorRegex = '',
+    String formaterRegex = r'.',
+    int minLength = -1,
+    int maxLength = -1,
     String errorMessage = '',
   }) {
-
     TextInputType inputType = TextInputType.text;
 
     switch (type) {
@@ -85,6 +92,13 @@ class _FloatingSettingsBoxState extends State<FloatingSettingsBox> {
             focusNode: focusNode,
             readOnly: !_isEditing,
             keyboardType: inputType,
+            inputFormatters: [
+              FilteringTextInputFormatter.allow(RegExp(formaterRegex)),
+              LengthLimitingTextInputFormatter(maxLength),
+              if (capitalize) _UpperCaseTextFormatter(),
+            ],
+            textCapitalization:
+                capitalize ? TextCapitalization.characters : TextCapitalization.none,
             textInputAction: TextInputAction.done,
             onTap: () => _beginEditing(focusNode),
             onEditingComplete: () => _finishEditing(focusNode),
@@ -107,6 +121,12 @@ class _FloatingSettingsBoxState extends State<FloatingSettingsBox> {
                 if(EmailValidator.validate(value) == false) {
                   return 'Email unvalid. Please provide a valid email';
                 }
+              }
+              if (maxLength != -1 && value.length > maxLength) {
+                return 'Not allowed. Code is too long.';
+              }
+              if (minLength != -1 && value.length < minLength) {
+                return 'Not allowed. Code is too short.';
               }
               if (validatorRegex.isNotEmpty && regExp.firstMatch(value) == null) {
                 return 'Not allowed. Please provide a valid response.';
@@ -175,11 +195,17 @@ class _FloatingSettingsBoxState extends State<FloatingSettingsBox> {
                     event.logicalKey == LogicalKeyboardKey.browserBack;
                 if (isBackKey && event is KeyDownEvent) {
                   if (_isEditing) {
-                    _finishEditing(_emailFocusNode.hasFocus
-                        ? _emailFocusNode
-                        : _passwordFocusNode.hasFocus
-                        ? _passwordFocusNode
-                        : _codeFocusNode);
+                    _finishEditing(
+                        // _emailFocusNode.hasFocus
+                        // ? _emailFocusNode
+                        // : _passwordFocusNode.hasFocus
+                        // ? _passwordFocusNode
+                        // : 
+                        _codeFocusNode.hasFocus
+                        ? _codeFocusNode
+                        : _mccId1FocusNode.hasFocus
+                        ? _mccId1FocusNode
+                        : _mccId2FocusNode);
                   } else {
                     _settingsMenuFocusNode.requestFocus();
                   }
@@ -190,32 +216,65 @@ class _FloatingSettingsBoxState extends State<FloatingSettingsBox> {
                   return KeyEventResult.ignored;
                 }
 
-                final focusNodes = [
-                  _emailFocusNode,
-                  _passwordFocusNode,
+                final List<FocusNode> focusNodes = [
+                  // _emailFocusNode,
+                  // _passwordFocusNode,
                   _codeFocusNode,
+                  _mccId1FocusNode,
+                  _mccId2FocusNode,
                   _submitFocusNode,
                   _cancelFocusNode,
                 ];
                 final currentIndex =
                     focusNodes.indexWhere((focusNode) => focusNode.hasFocus);
-
-                if (currentIndex >= 3 &&
-                    (event.logicalKey == LogicalKeyboardKey.arrowLeft ||
-                        event.logicalKey == LogicalKeyboardKey.arrowRight)) {
-                  if (currentIndex == 3 &&
-                      event.logicalKey == LogicalKeyboardKey.arrowRight) {
-                    _cancelFocusNode.requestFocus();
-                  } else if (currentIndex == 4 &&
-                      event.logicalKey == LogicalKeyboardKey.arrowLeft) {
-                    _submitFocusNode.requestFocus();
+                // Check if any of the nodes highlighted is in a row
+                if (( focusNodes[currentIndex] == _submitFocusNode ||
+                      focusNodes[currentIndex] == _cancelFocusNode ||
+                      focusNodes[currentIndex] == _mccId1FocusNode ||
+                      focusNodes[currentIndex] == _mccId2FocusNode ) && (
+                        event.logicalKey == LogicalKeyboardKey.arrowUp ||
+                        event.logicalKey == LogicalKeyboardKey.arrowDown ||
+                        event.logicalKey == LogicalKeyboardKey.arrowLeft ||
+                        event.logicalKey == LogicalKeyboardKey.arrowRight
+                      )) {
+                  if (focusNodes[currentIndex] == _submitFocusNode) {
+                    if (event.logicalKey == LogicalKeyboardKey.arrowRight) {
+                      _cancelFocusNode.requestFocus();
+                    } else
+                    if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
+                      _mccId1FocusNode.requestFocus();
+                    }
+                  } else 
+                  if (focusNodes[currentIndex] == _cancelFocusNode) {
+                    if (event.logicalKey == LogicalKeyboardKey.arrowLeft) {
+                      _submitFocusNode.requestFocus();
+                    } else
+                    if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
+                      _mccId2FocusNode.requestFocus();
+                    }
+                  } else
+                  if (focusNodes[currentIndex] == _mccId1FocusNode) {
+                    if (event.logicalKey == LogicalKeyboardKey.arrowRight) {
+                      _mccId2FocusNode.requestFocus();
+                    } else
+                    if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
+                      _submitFocusNode.requestFocus();
+                    } else
+                    if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
+                      _codeFocusNode.requestFocus();
+                    }
+                  } else
+                  if (focusNodes[currentIndex] == _mccId2FocusNode) {
+                    if (event.logicalKey == LogicalKeyboardKey.arrowLeft) {
+                      _mccId1FocusNode.requestFocus();
+                    } else
+                    if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
+                      _cancelFocusNode.requestFocus();
+                    } else
+                    if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
+                      _codeFocusNode.requestFocus();
+                    }
                   }
-                  return KeyEventResult.handled;
-                }
-
-                if (currentIndex >= 3 &&
-                    event.logicalKey == LogicalKeyboardKey.arrowUp) {
-                  _codeFocusNode.requestFocus();
                   return KeyEventResult.handled;
                 }
 
@@ -224,7 +283,7 @@ class _FloatingSettingsBoxState extends State<FloatingSettingsBox> {
                         event.logicalKey == LogicalKeyboardKey.enter ||
                         event.logicalKey == LogicalKeyboardKey.numpadEnter) &&
                     currentIndex >= 0 &&
-                    currentIndex < 3) {
+                    currentIndex < focusNodes.length - 2) {
                   _beginEditing(focusNodes[currentIndex]);
                   return KeyEventResult.handled;
                 }
@@ -258,26 +317,65 @@ class _FloatingSettingsBoxState extends State<FloatingSettingsBox> {
                     'Connect screen',
                     style: TextStyle(fontSize: 25.0, fontWeight: FontWeight(1000)),
                   ),
+                  // _buildTextInput(
+                  //   text: 'Email',
+                  //   hintText: 'example@email.com',
+                  //   type: TextInputTypeCustom.email,
+                  //   focusNode: _emailFocusNode,
+                  // ),
+                  // _buildTextInput(
+                  //   text: 'Password',
+                  //   hintText: '*********',
+                  //   type: TextInputTypeCustom.password,
+                  //   focusNode: _passwordFocusNode,
+                  //   obscureText: true,
+                  //   obscureCharacter: '*',
+                  // ),
                   _buildTextInput(
-                    text: 'Email',
-                    hintText: 'example@email.com',
-                    type: TextInputTypeCustom.email,
-                    focusNode: _emailFocusNode,
-                  ),
-                  _buildTextInput(
-                    text: 'Password',
-                    hintText: '*********',
-                    type: TextInputTypeCustom.password,
-                    focusNode: _passwordFocusNode,
-                    obscureText: true,
-                    obscureCharacter: '*',
-                  ),
-                  _buildTextInput(
-                    text: 'Code',
+                    text: 'Systeem ID',
                     hintText: '123123123123',
                     type: TextInputTypeCustom.code,
                     focusNode: _codeFocusNode,
-                    validatorRegex: r'^[0-9]{12}$'
+                    validatorRegex: r'^[0-9]{12}$',
+                    formaterRegex: r'[0-9]',
+                    minLength: 12,
+                    maxLength: 12,
+                  ),
+                  Row( 
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child:  _buildTextInput(
+                          text: 'MCC Koppel Code',
+                          hintText: 'ABC',
+                          type: TextInputTypeCustom.code,
+                          focusNode: _mccId1FocusNode,
+                          validatorRegex: r'^[A-Z]{3}$',
+                          formaterRegex: r'[a-zA-Z]',
+                          capitalize: true,
+                          minLength: 3,
+                          maxLength: 3,
+                        )
+                      ),
+                      SizedBox(
+                        height: 89,
+                        child: Center(
+                          child: Text('  —  '),
+                        ),
+                      ),
+                      Expanded(
+                        child: _buildTextInput(
+                          text: '',
+                          hintText: '12345',
+                          type: TextInputTypeCustom.code,
+                          focusNode: _mccId2FocusNode,
+                          validatorRegex: r'^[0-9]{5}$',
+                          formaterRegex: r'[0-9]',
+                          minLength: 5,
+                          maxLength: 5,
+                        )
+                      ),
+                    ]
                   ),
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 16),
@@ -374,5 +472,33 @@ class _FloatingSettingsBoxState extends State<FloatingSettingsBox> {
     _submitFocusNode.dispose();
     _cancelFocusNode.dispose();
     super.dispose();
+  }
+}
+
+class _UpperCaseTextFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    final upperCaseText = newValue.text.toUpperCase();
+    if (upperCaseText == newValue.text) return newValue;
+
+    int clampOffset(int offset) {
+      if (offset < 0) return 0;
+      if (offset > upperCaseText.length) return upperCaseText.length;
+      return offset;
+    }
+
+    return TextEditingValue(
+      text: upperCaseText,
+      selection: TextSelection(
+        baseOffset: clampOffset(newValue.selection.baseOffset),
+        extentOffset: clampOffset(newValue.selection.extentOffset),
+        affinity: newValue.selection.affinity,
+        isDirectional: newValue.selection.isDirectional,
+      ),
+      composing: newValue.composing,
+    );
   }
 }
