@@ -5,7 +5,9 @@ import 'dart:math' as math;
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_video_test/classes/api_mcc_data.dart';
 import 'package:flutter_video_test/classes/frame_ticker_position.dart';
+import 'package:flutter_video_test/classes/system_data_login_file.dart';
 import 'package:flutter_video_test/widgets/activity_monitor.dart';
 import 'package:flutter_video_test/widgets/floating_settings_box.dart';
 import 'package:video_player/video_player.dart';
@@ -137,6 +139,29 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
     );
     unawaited(_checkConnectivity());
     unawaited(_prepareMedia(startChangeChecks: true));
+
+    unawaited(_testSystemFile());
+  }
+
+  Future<void> _testSystemFile() async {
+    await SystemDataLoginFile().storeUuid();
+    // await SystemDataLoginFile().storeIds(
+    //   mccAppId: 'ABC-12345',
+    //   systemId: '123123123123'
+    // );
+
+    String? testString1 = await SystemDataLoginFile().readUuid();
+    String testString2 = '';
+    String testString3 = '';
+    final ids = await SystemDataLoginFile().readIds();
+    if (ids != null) {
+      testString2 = ids.$1;
+      testString3 = ids.$2;
+    }
+
+    print('Uuid: $testString1');
+    print('MccAppId: $testString2');
+    print('SystemId: $testString3');
   }
 
   Future<void> _checkConnectivity() async {
