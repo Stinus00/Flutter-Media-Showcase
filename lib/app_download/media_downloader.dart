@@ -116,16 +116,22 @@ class MediaDownloader {
   }
 
   // Download all media gathered from media_sources
-  Future<List<dynamic>> downloadAllMedia({required List<dynamic> links}) async {
+  Future<List<dynamic>> downloadAllMedia({
+    required List<dynamic> links,
+    void Function(int completed, int total)? onProgress,
+  }) async {
     final downloadedLinks = <dynamic>[];
+    var completed = 0;
 
     for (final media in links) {
       debugPrint("(${media.type}) Downloading: ${media.link} as ${media.id!}");
       var path = '';
+      var itemReady = false;
       switch (media.type) {
         case 'image':
           path = await _downloadImage(link: media.link, name: media.id!);
           if (path == '') break;
+          itemReady = true;
           downloadedLinks.add(
             MediaLink(
               id: media.id,
@@ -142,6 +148,7 @@ class MediaDownloader {
         case 'video':
           path = await _downloadVideo(link: media.link, name: media.id!);
           if (path == '') break;
+          itemReady = true;
           downloadedLinks.add(
             MediaLink(
               id: media.id,
@@ -158,6 +165,7 @@ class MediaDownloader {
         case 'frame':
           path = await _downloadFrame(link: media.link, name: media.id!);
           if (path == '') break;
+          itemReady = true;
           downloadedLinks.add(
             FrameLink(
               id: media.id,
@@ -180,6 +188,7 @@ class MediaDownloader {
           debugPrint("-------------------------------------------");
           break;
         case 'ticker':
+          itemReady = true;
           if(media.creationType == 'custom' && media.tickerType == 2) {
             path = await _downloadTicker(link: media.link, name: media.id!, tickerStrings: media.tickerStrings);
           }
@@ -204,6 +213,8 @@ class MediaDownloader {
         default:
           break;
       }
+      if (itemReady) completed++;
+      onProgress?.call(completed, links.length);
     }
 
     return downloadedLinks;

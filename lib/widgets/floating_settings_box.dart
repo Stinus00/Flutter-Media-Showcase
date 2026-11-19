@@ -1,18 +1,27 @@
 import 'dart:async';
-import 'dart:math';
 
 import 'package:email_validator/email_validator.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_video_test/api/api_call.dart';
 import 'package:flutter_video_test/classes/system_data_login_file.dart';
+import 'package:flutter_video_test/main.dart';
 
 class FloatingSettingsBox extends StatefulWidget {
   const FloatingSettingsBox({
     super.key,
-    required this.onCloseSettings
+    required this.onCloseSettings,
+    required this.onConnected,
+    required this.onDisconnected,
+    required this.tryConnect,
   });
 
   final VoidCallback onCloseSettings;
+  final Future<void> Function(
+    void Function(String phase, int completed, int total) onProgress,
+  ) onConnected;
+  final Future<void> Function() onDisconnected;
+  final Future<bool> Function(String systemId) tryConnect;
 
   @override
   State<FloatingSettingsBox> createState() => _FloatingSettingsBoxState();
@@ -39,12 +48,14 @@ class _FloatingSettingsBoxState extends State<FloatingSettingsBox> {
   final _systemIdController = TextEditingController();
   final _mccId1Controller = TextEditingController();
   final _mccId2Controller = TextEditingController();
+  final ValueNotifier<String> _downloadProgress = ValueNotifier('Downloading...');
 
   final SystemDataLoginFile _file = SystemDataLoginFile();
 
-  bool disabled = false;
   bool _isEditing = false;
+  bool _isConnecting = false;
   bool _startReadOnly = false;
+  String? _connectionError;
 
   @override
   void initState() {
@@ -133,6 +144,7 @@ class _FloatingSettingsBoxState extends State<FloatingSettingsBox> {
         ),
         SizedBox(
           child: TextFormField(
+            enabled: !_startReadOnly && !_isConnecting,
             focusNode: focusNode,
             readOnly: _startReadOnly || !_isEditing,
             keyboardType: inputType,
@@ -155,7 +167,7 @@ class _FloatingSettingsBoxState extends State<FloatingSettingsBox> {
               fillColor: Colors.transparent,
               border: OutlineInputBorder(),
               focusedBorder: const OutlineInputBorder(
-                borderSide: BorderSide(color: Colors.blue, width: 3),
+                borderSide: BorderSide(color: Colors.orange, width: 3),
               ),
             ),
             validator: (value) {
@@ -187,7 +199,7 @@ class _FloatingSettingsBoxState extends State<FloatingSettingsBox> {
   }
 
   void _beginEditing(FocusNode focusNode) {
-    if (_startReadOnly || _isEditing || disabled) return;
+    if (_startReadOnly || _isEditing || _isConnecting) return;
 
     focusNode.unfocus();
     setState(() {
@@ -386,6 +398,29 @@ class _FloatingSettingsBoxState extends State<FloatingSettingsBox> {
                       'Connect screen',
                       style: TextStyle(fontSize: 25.0, fontWeight: FontWeight(1000)),
                     ),
+                    // if (_connectionError != null)
+                    //   Container(
+                    //     margin: const EdgeInsets.symmetric(vertical: 12),
+                    //     padding: const EdgeInsets.all(12),
+                    //     decoration: BoxDecoration(
+                    //       color: Colors.red.shade50,
+                    //       border: Border.all(color: Colors.red.shade300),
+                    //       borderRadius: BorderRadius.circular(8),
+                    //     ),
+                    //     child: Row(
+                    //       crossAxisAlignment: CrossAxisAlignment.start,
+                    //       children: [
+                    //         Icon(Icons.error_outline, color: Colors.red.shade700),
+                    //         const SizedBox(width: 8),
+                    //         Expanded(
+                    //           child: Text(
+                    //             'Could not prepare media:\n$_connectionError',
+                    //             style: TextStyle(color: Colors.red.shade900),
+                    //           ),
+                    //         ),
+                    //       ],
+                    //     ),
+                    //   ),
                     // _buildTextInput(
                     //   text: 'Email',
                     //   hintText: 'example@email.com',
@@ -457,11 +492,12 @@ class _FloatingSettingsBoxState extends State<FloatingSettingsBox> {
                           Expanded(
                             child: ElevatedButton(
                               focusNode: _submitFocusNode,
-                              onPressed: disabled ? null : () async {
+                              onPressed: _isConnecting ? null : () async {
                                 // Validate returns true if the form is valid, or false otherwise.
                                 if (_formKey.currentState!.validate()) {
                                   setState(() {
-                                    disabled = true;
+                                    _connectionError = null;
+                                    _isConnecting = true;
                                   });
                                   // If the form is valid, display a snackbar. In the real world,
                                   // you'd often call a server or save the information in a database.
@@ -471,24 +507,53 @@ class _FloatingSettingsBoxState extends State<FloatingSettingsBox> {
                                         SnackBar(
                                           content: const Text('Connecting...'),
                                           duration: Duration(
-                                            seconds: Random().nextInt(10) + 5,
+                                            seconds: 2,
                                           ),
                                         ),
-                                      )
-                                      .closed;
-                                  if (!mounted) return;
-                                  if(Random().nextInt(2) == 0) {
+                                      ).closed;
+                                  try {
+                                    if (!mounted) return;
+                                    if(await widget.tryConnect(_systemIdController.text) == false) {
+                                      throw Exception("Couldn't connect");
+                                    }
+
+                                    _downloadProgress.value = 'Downloading...';
+                                    messenger.showSnackBar(
+                                      SnackBar(
+                                        content: ValueListenableBuilder<String>(
+                                          valueListenable: _downloadProgress,
+                                          builder: (context, progress, _) =>
+                                              Text(progress),
+                                        ),
+                                        duration: const Duration(days: 1),
+                                      ),
+                                    );
+                                    if (!mounted) return;
                                     await _file.storeIds(
                                       mccAppId: '${_mccId1Controller.text}-${_mccId2Controller.text}',
                                       systemId: _systemIdController.text,
                                     );
+                                    await widget.onConnected((
+                                      phase,
+                                      completed,
+                                      total,
+                                    ) {
+                                      if (mounted) {
+                                        _downloadProgress.value =
+                                            'Downloading $phase: $completed/$total';
+                                      }
+                                    });
 
                                     widget.onCloseSettings();
+
+                                    messenger.hideCurrentSnackBar();
+
                                     await messenger
                                         .showSnackBar(
                                           const SnackBar(
                                             content: Text('Connected!'),
                                             backgroundColor: Colors.green,
+                                            
                                             duration: Duration(seconds: 3),
                                           ),
                                         )
@@ -497,9 +562,16 @@ class _FloatingSettingsBoxState extends State<FloatingSettingsBox> {
                                     if (!mounted) return;
 
                                     setState(() {
-                                      disabled = false;
+                                      _isConnecting = false;
                                     });
-                                  } else {
+
+                                  } catch (error) {
+                                    messenger.hideCurrentSnackBar();
+                                    await _file.storeIds(
+                                      mccAppId: '',
+                                      systemId: '',
+                                    );
+
                                     await messenger
                                         .showSnackBar(
                                           const SnackBar(
@@ -509,10 +581,11 @@ class _FloatingSettingsBoxState extends State<FloatingSettingsBox> {
                                           ),
                                         )
                                         .closed;
-                                    if (!mounted) return;
 
+                                    if (!mounted) return;
                                     setState(() {
-                                      disabled = false;
+                                      _connectionError = error.toString();
+                                      _isConnecting = false;
                                     });
                                   }
                                 }
@@ -522,8 +595,14 @@ class _FloatingSettingsBoxState extends State<FloatingSettingsBox> {
                           ) : Expanded(
                             child: ElevatedButton(
                               focusNode: _disconnectFocusNode,
+                              style: ButtonStyle(
+                                backgroundColor: WidgetStatePropertyAll<Color>(Color.fromARGB(255, 255, 152, 152)),
+                                foregroundColor: WidgetStatePropertyAll<Color>(Colors.red)
+                              ),
                               onPressed: () async {
-                                _file.storeIds(mccAppId: '', systemId: '');
+                                await widget.onDisconnected();
+
+                                await _file.storeIds(mccAppId: '', systemId: '');
                                 _systemIdController.text = '';
                                 _mccId1Controller.text = '';
                                 _mccId2Controller.text = '';
@@ -533,8 +612,7 @@ class _FloatingSettingsBoxState extends State<FloatingSettingsBox> {
                                 WidgetsBinding.instance.addPostFrameCallback((_) {
                                   if (mounted) {
                                     _disconnectFocusNode.unfocus();
-                                    _submitFocusNode.unfocus();
-                                    _settingsFocusScope.requestFocus(_systemIdFocusNode);
+                                    _settingsFocusScope.requestFocus(_submitFocusNode);
                                   }
                                 });
                               }, 
@@ -578,6 +656,7 @@ class _FloatingSettingsBoxState extends State<FloatingSettingsBox> {
     _mccId1Controller.dispose();
     _mccId2Controller.dispose();
     _systemIdController.dispose();
+    _downloadProgress.dispose();
     super.dispose();
   }
 }

@@ -3,9 +3,9 @@ import 'dart:io';
 import 'dart:math' as math;
 
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_video_test/classes/api_mcc_data.dart';
 import 'package:flutter_video_test/classes/frame_ticker_position.dart';
 import 'package:flutter_video_test/classes/system_data_login_file.dart';
 import 'package:flutter_video_test/widgets/activity_monitor.dart';
@@ -201,13 +201,29 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
   }
 
   // Download the media given and initialize the first media.
-  Future<void> _prepareMedia({bool startChangeChecks = false}) async {
+  Future<void> _prepareMedia({
+    bool startChangeChecks = false,
+    void Function(String phase, int completed, int total)? onDownloadProgress,
+  }) async {
+    if (mounted) {
+      setState(() {
+        _isPreparingMedia = true;
+        _preloadError = null;
+      });
+    }
+
     try {
       if (_mediaLinks.isEmpty) {
-        _mediaLinks = await _apiCall.getMediaFromApi();
+        _mediaLinks = await _apiCall.getMediaFromApi(
+          onProgress: (completed, total) =>
+              onDownloadProgress?.call('media', completed, total),
+        );
       }
       if (_frameLinks.isEmpty) {
-        _frameLinks = await _apiCall.getFrameLinksFromApi();
+        _frameLinks = await _apiCall.getFrameLinksFromApi(
+          onProgress: (completed, total) =>
+              onDownloadProgress?.call('frames', completed, total),
+        );
       }
 
       List<TickerLink> tickerLinksOne = [];
@@ -215,7 +231,10 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
 
       if (_tickerLinksMain.isEmpty) {
         (tickerLinksOne, tickerLinksTwo) = await _apiCall
-            .getTickerLinksFromApi();
+            .getTickerLinksFromApi(
+              onProgress: (completed, total) =>
+                  onDownloadProgress?.call('tickers', completed, total),
+            );
       }
       _tickerLinksMain = tickerLinksOne;
       _tickerLinksSecondary = tickerLinksTwo;
@@ -229,12 +248,12 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
       if (startChangeChecks) {
         _startChangeChecks();
       }
-    } catch (error) {
+    } on DioException catch (error) {
       if (!mounted) return;
       if (startChangeChecks) {
         _startChangeChecks();
       }
-      if (!kIsWeb) {
+      if (!kIsWeb && error.type == DioExceptionType.connectionError) {
         final cached = await _apiCall.loadSavedApiMedia();
         if (cached.media.isNotEmpty) {
           _mediaLinks = cached.media;
@@ -262,6 +281,14 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
         _isPreparingMedia = false;
         _preloadError = error.toString();
       });
+    } catch (error) {
+      print('Error found: $error');
+      if (mounted) {
+        setState(() {
+          _isPreparingMedia = false;
+          _preloadError = error.toString();
+        });
+      }
     }
   }
 
@@ -322,6 +349,38 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
           _updateTickers();
         });
       }
+    });
+  }
+
+  Future<void> _onDisconnect() async {
+    await _apiCall.fullyDeleteStoredMedia();
+
+    _scheduleCheckTimer?.cancel();
+    _payloadCheckTimer?.cancel();
+    _tickerCheckTimer?.cancel();
+
+    _imageTimer?.cancel();
+    _frameTimer?.cancel();
+    _controller?.dispose();
+
+    setState(() {
+      _mediaLinks = [];
+      _frameLinks = [];
+      _tickerLinksMain = [];
+      _tickerLinksSecondary = [];
+      tickerMain = [];
+      tickerSecondary = [];
+
+      frameTickerPositions = [];
+
+      _currentLinkIndex = 0;
+      _currentLinkIndexFrame = 0;
+
+      x1 = null;
+      x2 = null;
+      y1 = null;
+      y2 = null;
+      creationType = null;
     });
   }
 
@@ -956,11 +1015,27 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
                       child: _buildSettingsButton(),
                     ),
                   if(_showSettings)
-                    FloatingSettingsBox(onCloseSettings: () {
-                      setState(() {
-                        _showSettings = false;
-                      }); 
-                    }),
+                    FloatingSettingsBox(
+                      onConnected: (onProgress) async {
+                        await _prepareMedia(
+                          startChangeChecks: true,
+                          onDownloadProgress: onProgress,
+                        );
+                        final error = _preloadError;
+                        if (error != null) {
+                          throw StateError(error);
+                        }
+                      },
+                      onDisconnected: () => _onDisconnect(),
+                      onCloseSettings: () {
+                        setState(() {
+                          _showSettings = false;
+                        }); 
+                      },
+                      tryConnect: (String systemId) async {
+                        return await _apiCall.tryConnect(systemId);
+                      },
+                    ),
                   if (_hasNetworkConnection == false)
                     Align(
                       alignment: Alignment.topLeft,
@@ -1181,11 +1256,8 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
     }
 
     if (_frameLinks.isEmpty) {
-      return Image.asset(
-        'assets/placeholder.png',
-        fit: BoxFit.contain,
-        height: double.infinity,
-        width: double.infinity,
+      return Padding(
+        padding: const EdgeInsets.all(24)
       );
     }
 

@@ -14,6 +14,7 @@ class MediaDeletion {
     required Set<String> frameIds,
   }) async {
     final directory = await _mediaDownloader.downloadDirectory;
+
     await _deleteFilesNotInApi(Directory('${directory.path}/images'), imageIds);
     await _deleteFilesNotInApi(Directory('${directory.path}/videos'), videoIds);
     await _deleteFilesNotInApi(Directory('${directory.path}/frames'), frameIds);
@@ -42,5 +43,25 @@ class MediaDeletion {
         await entity.delete();
       }
     }
+  }
+
+  Future<void> fullyDeleteMedia() async{
+    final directory = await _mediaDownloader.downloadDirectory;
+
+    await _fullyDeleteMediaInDirectory(Directory('${directory.path}/images'));
+    await _fullyDeleteMediaInDirectory(Directory('${directory.path}/videos'));
+    await _fullyDeleteMediaInDirectory(Directory('${directory.path}/frames'));
+    await _fullyDeleteMediaInDirectory(Directory('${directory.path}/tickers'));
+    await _fullyDeleteMediaInDirectory(Directory('${directory.path}/json'));
+  }
+
+  Future<void> _fullyDeleteMediaInDirectory(
+    Directory directory,
+  ) async {
+    if (!await directory.exists()) return;
+    await for (final entity in directory.list()) {
+      entity.delete();
+    }
+    await directory.delete();
   }
 }

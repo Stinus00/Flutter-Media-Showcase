@@ -57,7 +57,7 @@ class SystemDataLoginFile{
     final data = jsonDecode(await file.readAsString());
     data['mccAppId'] = mccAppId;
     data['systemId'] = '${systemId}_1';
-    file.writeAsString(JsonEncoder.withIndent('  ').convert(data));
+    await file.writeAsString(JsonEncoder.withIndent('  ').convert(data));
   }
 
   Future<(String, String)?> readIds() async {

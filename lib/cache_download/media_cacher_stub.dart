@@ -1,5 +1,8 @@
 class MediaCacher {
-  Future<List<dynamic>> cacheAllMedia({required List<dynamic> links}) =>
+  Future<List<dynamic>> cacheAllMedia({
+    required List<dynamic> links,
+    void Function(int completed, int total)? onProgress,
+  }) =>
       throw UnsupportedError('MediaCacher is only available on web.');
 
   Future<String> loadImageBlobUrlFromIndexedDB(String id) =>

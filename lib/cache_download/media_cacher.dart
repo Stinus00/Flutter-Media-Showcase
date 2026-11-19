@@ -52,7 +52,10 @@ class MediaCacher {
   }
 
   // Go through the list to download/cache all media.
-  Future<List<dynamic>> cacheAllMedia({required List<dynamic> links}) async {
+  Future<List<dynamic>> cacheAllMedia({
+    required List<dynamic> links,
+    void Function(int completed, int total)? onProgress,
+  }) async {
     final downloadedLinks = <dynamic>[];
     DefaultCacheManager().emptyCache();
 
@@ -120,6 +123,7 @@ class MediaCacher {
         default:
           break;
       }
+      onProgress?.call(downloadedLinks.length, links.length);
     }
 
     return downloadedLinks;
