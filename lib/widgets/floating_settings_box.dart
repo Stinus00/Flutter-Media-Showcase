@@ -411,6 +411,7 @@ class _FloatingSettingsBoxState extends State<FloatingSettingsBox> {
               child: Form(
                 key: _formKey,
                 child: ListView(
+                  shrinkWrap: true,
                   children: [
                     Text(
                       'Connect screen',
