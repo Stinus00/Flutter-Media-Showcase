@@ -516,7 +516,8 @@ class ApiCall {
         // }
       }
 
-      _dio.options.headers[secrets['api_header']] = secrets['api_key'];
+      _dio.options.headers['X-BCM-API-KEY'] = secrets['api_key'];
+      _dio.options.headers['X-BCM-UUID'] = '0000-0000';
 
       final url = 'https://api.mediacontrolcenter.com/api/v1/system/$systemId/export-full';
       // final url = secrets['api_url'];
