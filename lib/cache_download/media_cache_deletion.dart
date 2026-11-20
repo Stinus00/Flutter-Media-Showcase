@@ -21,9 +21,18 @@ class MediaCacheDeletion {
     final cachedIds = await _mediaCacher.getMediaKeysWeb(store);
     for (final id in cachedIds.difference(apiIds)) {
       print('Deleting $id');
-      print('-----=====-----');
       await _mediaCacher.deleteMediaWeb(store, id);
       _mediaCacher.forgetBlobUrlWeb(store, id);
     }
+  }
+
+  Future<void> fullyDeleteMedia() async {
+    await _fullyDeleteMediaInIndexedDB();
+  }
+
+  Future<void> _fullyDeleteMediaInIndexedDB() async {
+    await _deleteStoreEntries('images', const {});
+    await _deleteStoreEntries('videos', const {});
+    await _deleteStoreEntries('frames', const {});
   }
 }

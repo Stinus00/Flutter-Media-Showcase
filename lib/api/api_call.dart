@@ -85,7 +85,6 @@ class ApiCall {
 
     try {
       final responseJson = _currentResponseJson;
-      print('ResponseJson $_currentResponseJson');
       final data = responseJson == null
           ? await _getJsonFromUrl()
           : jsonDecode(responseJson) as Map<String, dynamic>;
@@ -497,7 +496,6 @@ class ApiCall {
   // Get JSON from api
   Future<Map<String, dynamic>> _getJsonFromUrl() async {
     try {
-      print('TestJsonUrl');
       final secrets = await _getSecrets();
       final systemData = await SystemDataLoginFile().readIds();
       String systemId = '';
@@ -1043,11 +1041,17 @@ class ApiCall {
 
   Future<void> fullyDeleteStoredMedia() async {
     if (kIsWeb) {
+      await _mediaCacheDeletion.fullyDeleteMedia();
     } else {
       await _mediaDeletion.fullyDeleteMedia();
-      _currentResponseJson = null;
-      _pendingResponseJson = null;
     }
+
+    _currentResponseJson = null;
+    _pendingResponseJson = null;
+    _lastActiveScheduleIds = null;
+    _lastActiveScheduleFrameIds = null;
+    _lastActiveScheduleTickerIds = null;
+    oldJson = null;
   }
 
   @visibleForTesting

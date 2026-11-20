@@ -139,29 +139,6 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
     );
     unawaited(_checkConnectivity());
     unawaited(_prepareMedia(startChangeChecks: true));
-
-    unawaited(_testSystemFile());
-  }
-
-  Future<void> _testSystemFile() async {
-    await SystemDataLoginFile().storeUuid();
-    // await SystemDataLoginFile().storeIds(
-    //   mccAppId: 'ABC-12345',
-    //   systemId: '123123123123'
-    // );
-
-    String? testString1 = await SystemDataLoginFile().readUuid();
-    String testString2 = '';
-    String testString3 = '';
-    final ids = await SystemDataLoginFile().readIds();
-    if (ids != null) {
-      testString2 = ids.$1;
-      testString3 = ids.$2;
-    }
-
-    print('Uuid: $testString1');
-    print('MccAppId: $testString2');
-    print('SystemId: $testString3');
   }
 
   Future<void> _checkConnectivity() async {
@@ -230,11 +207,10 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
       List<TickerLink> tickerLinksTwo = [];
 
       if (_tickerLinksMain.isEmpty) {
-        (tickerLinksOne, tickerLinksTwo) = await _apiCall
-            .getTickerLinksFromApi(
-              onProgress: (completed, total) =>
-                  onDownloadProgress?.call('tickers', completed, total),
-            );
+        (tickerLinksOne, tickerLinksTwo) = await _apiCall.getTickerLinksFromApi(
+          onProgress: (completed, total) =>
+              onDownloadProgress?.call('tickers', completed, total),
+        );
       }
       _tickerLinksMain = tickerLinksOne;
       _tickerLinksSecondary = tickerLinksTwo;
@@ -301,7 +277,7 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
     _payloadCheckTimer?.cancel();
     _tickerCheckTimer?.cancel();
 
-    _scheduleCheckTimer ??= Timer.periodic(const Duration(minutes: 1), (_) {
+    _scheduleCheckTimer = Timer.periodic(const Duration(minutes: 1), (_) {
       // Check if schedules have changed
       if (_mediaLinks.isEmpty) {
         setState(() {
@@ -314,7 +290,7 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
         });
       }
     });
-    _payloadCheckTimer ??= Timer.periodic(const Duration(minutes: 15), (_) {
+    _payloadCheckTimer = Timer.periodic(const Duration(minutes: 15), (_) {
       // Check if API callback has changed
       if (_hasNetworkConnection == true) {
         if (_mediaLinks.isEmpty) {
@@ -329,9 +305,7 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
         }
       }
     });
-    _tickerCheckTimer ??= Timer.periodic(const Duration(minutes: 10), (
-      _,
-    ) async {
+    _tickerCheckTimer = Timer.periodic(const Duration(minutes: 10), (_) async {
       // Check if tickersources have changed
       if (_hasNetworkConnection == true) {
         final updatedTickerLinks = await _apiCall
@@ -358,6 +332,10 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
     _scheduleCheckTimer?.cancel();
     _payloadCheckTimer?.cancel();
     _tickerCheckTimer?.cancel();
+
+    _scheduleCheckTimer = null;
+    _payloadCheckTimer = null;
+    _tickerCheckTimer = null;
 
     _imageTimer?.cancel();
     _frameTimer?.cancel();
@@ -1014,7 +992,7 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
                       top: 16,
                       child: _buildSettingsButton(),
                     ),
-                  if(_showSettings)
+                  if (_showSettings)
                     FloatingSettingsBox(
                       onConnected: (onProgress) async {
                         await _prepareMedia(
@@ -1030,7 +1008,7 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
                       onCloseSettings: () {
                         setState(() {
                           _showSettings = false;
-                        }); 
+                        });
                       },
                       tryConnect: (String systemId) async {
                         return await _apiCall.tryConnect(systemId);
@@ -1256,9 +1234,7 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
     }
 
     if (_frameLinks.isEmpty) {
-      return Padding(
-        padding: const EdgeInsets.all(24)
-      );
+      return Padding(padding: const EdgeInsets.all(24));
     }
 
     final media = _currentMediaFrame!;

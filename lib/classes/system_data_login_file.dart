@@ -1,74 +1,58 @@
 import 'dart:convert';
-import 'dart:io';
 
-import 'package:flutter/foundation.dart';
-import 'package:flutter_video_test/app_download/media_downloader.dart';
 import 'package:uuid/uuid.dart';
 
-class SystemDataLoginFile{
-  String _generateUuid() {
-    var uuid = Uuid();
-    return uuid.v7();
+import 'system_data_login_storage_io.dart'
+    if (dart.library.js_interop) 'system_data_login_storage_web.dart'
+    as storage;
+
+class SystemDataLoginFile {
+  Future<Map<String, dynamic>> _readData() async {
+    final contents = await storage.readSystemData();
+    if (contents == null || contents.isEmpty) return <String, dynamic>{};
+
+    final decoded = jsonDecode(contents);
+    if (decoded is! Map<String, dynamic>) {
+      throw const FormatException('System data must be a JSON object.');
+    }
+    return decoded;
   }
 
-  Future<File> _getSystemDataFile() async {
-    Directory directory = await MediaDownloader().downloadDirectory;
-    final file = File('${directory.path}/system_data.json');
-
-    if(!await file.exists()) await file.create(recursive: true);
-    return file;
+  Future<void> _writeData(Map<String, dynamic> data) {
+    return storage.writeSystemData(
+      const JsonEncoder.withIndent('  ').convert(data),
+    );
   }
 
   Future<void> storeUuid() async {
-    if(kIsWeb) {
+    final data = await _readData();
+    if (data['uuid'] is String) return;
 
-    } else {
-      final file = await _getSystemDataFile();
-      dynamic decoded;
-      if(await file.length() != 0) {
-        decoded = jsonDecode(await file.readAsString());
-        if(decoded['uuid'] != null) return;
-      }
-
-      file.writeAsString(JsonEncoder.withIndent('  ').convert({
-        'uuid': _generateUuid()
-      }));
-
-      debugPrint('Created system_data.json at ${file.path}');
-    }
+    data['uuid'] = const Uuid().v7();
+    await _writeData(data);
   }
 
   Future<String?> readUuid() async {
-    final file = await _getSystemDataFile();
-    dynamic decoded;
-    if(await file.length() != 0) {
-      decoded = jsonDecode(await file.readAsString());
-      if(decoded['uuid'] != null) return decoded['uuid'];
-    }
-    return null;
+    final uuid = (await _readData())['uuid'];
+    return uuid is String ? uuid : null;
   }
 
   Future<void> storeIds({
-    required String mccAppId, 
-    required String systemId
+    required String mccAppId,
+    required String systemId,
   }) async {
-    final file = await _getSystemDataFile();
-
-    final data = jsonDecode(await file.readAsString());
+    final data = await _readData();
     data['mccAppId'] = mccAppId;
     data['systemId'] = '${systemId}_1';
-    await file.writeAsString(JsonEncoder.withIndent('  ').convert(data));
+    await _writeData(data);
   }
 
   Future<(String, String)?> readIds() async {
-    final file = await _getSystemDataFile();
-    dynamic decoded;
-    if(await file.length() != 0) {
-      decoded = jsonDecode(await file.readAsString());
-      if( decoded['mccAppId'] != null && 
-          decoded['systemId'] != null ) {
-            return (decoded['mccAppId'], decoded['systemId']) as (String, String);
-      }
+    final data = await _readData();
+    final mccAppId = data['mccAppId'];
+    final systemId = data['systemId'];
+    if (mccAppId is String && systemId is String) {
+      return (mccAppId, systemId);
     }
     return null;
   }

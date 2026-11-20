@@ -3,9 +3,7 @@ import 'dart:async';
 import 'package:email_validator/email_validator.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_video_test/api/api_call.dart';
 import 'package:flutter_video_test/classes/system_data_login_file.dart';
-import 'package:flutter_video_test/main.dart';
 
 class FloatingSettingsBox extends StatefulWidget {
   const FloatingSettingsBox({
@@ -48,13 +46,14 @@ class _FloatingSettingsBoxState extends State<FloatingSettingsBox> {
   final _systemIdController = TextEditingController();
   final _mccId1Controller = TextEditingController();
   final _mccId2Controller = TextEditingController();
-  final ValueNotifier<String> _downloadProgress = ValueNotifier('Downloading...');
+  final ValueNotifier<String> _downloadProgress = ValueNotifier('Starting Download...');
 
   final SystemDataLoginFile _file = SystemDataLoginFile();
 
   bool _isEditing = false;
   bool _isConnecting = false;
   bool _startReadOnly = false;
+  bool _disableCancel = false;
   String? _connectionError;
 
   @override
@@ -446,14 +445,14 @@ class _FloatingSettingsBoxState extends State<FloatingSettingsBox> {
                       minLength: 12,
                       maxLength: 12,
                     ),
-                    Row( 
+                    Row( //
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Expanded(
                           child:  _buildTextInput(
                             text: 'MCC Koppel Code',
                             hintText: 'ABC',
-                            type: TextInputTypeCustom.code,
+                            type: TextInputTypeCustom.text,
                             controller: _mccId1Controller,
                             focusNode: _mccId1FocusNode,
                             validatorRegex: r'^[A-Z]{3}$',
@@ -517,6 +516,9 @@ class _FloatingSettingsBoxState extends State<FloatingSettingsBox> {
                                       throw Exception("Couldn't connect");
                                     }
 
+                                    setState(() {
+                                      _disableCancel = true;
+                                    });
                                     _downloadProgress.value = 'Downloading...';
                                     messenger.showSnackBar(
                                       SnackBar(
@@ -563,6 +565,7 @@ class _FloatingSettingsBoxState extends State<FloatingSettingsBox> {
 
                                     setState(() {
                                       _isConnecting = false;
+                                      _disableCancel = false;
                                     });
 
                                   } catch (error) {
@@ -623,7 +626,7 @@ class _FloatingSettingsBoxState extends State<FloatingSettingsBox> {
                           Expanded(
                             child: ElevatedButton(
                               focusNode: _cancelFocusNode,
-                              onPressed: widget.onCloseSettings,
+                              onPressed: _disableCancel ? null : widget.onCloseSettings,
                               child: const Text('Cancel'),
                             ),
                           ),
