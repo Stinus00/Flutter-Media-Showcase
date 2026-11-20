@@ -56,6 +56,16 @@ class _FloatingSettingsBoxState extends State<FloatingSettingsBox> {
   bool _disableCancel = false;
   String? _connectionError;
 
+  final _borderColor = Color.fromARGB(255, 57, 68, 92);
+  final _focusColor = Color.fromARGB(255, 255, 106, 0);
+  final _buttonIdleColor = Color.fromARGB(255, 255, 106, 0);
+  final _disabledButtonIdleColor = Color.fromARGB(255, 152, 149, 149);
+  final _buttonFocusColor = Color.fromARGB(255, 255, 135, 50);
+  final _backgroundColor = Color.fromARGB(255, 20, 31, 56);
+  final _backgroundTextColor = Color.fromARGB(255, 5, 8, 15);
+  final _textColor = Color.fromARGB(255, 255, 250, 250);
+  final _disabledTextColor = Color.fromARGB(255, 152, 149, 149);
+
   @override
   void initState() {
     super.initState();
@@ -133,17 +143,19 @@ class _FloatingSettingsBoxState extends State<FloatingSettingsBox> {
 
     RegExp regExp = RegExp(validatorRegex);
 
+    bool isEnabled = !_startReadOnly && !_isConnecting;
+
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           text,
-          style: TextStyle(fontSize: 15.0),
+          style: TextStyle(fontSize: 15.0, color: _textColor),
         ),
         SizedBox(
           child: TextFormField(
-            enabled: !_startReadOnly && !_isConnecting,
+            enabled: isEnabled,
             focusNode: focusNode,
             readOnly: _startReadOnly || !_isEditing,
             keyboardType: inputType,
@@ -160,13 +172,20 @@ class _FloatingSettingsBoxState extends State<FloatingSettingsBox> {
             onEditingComplete: () => _finishEditing(focusNode),
             obscureText: obscureText,
             obscuringCharacter: obscureCharacter,
+            style: TextStyle(
+              color: isEnabled ? _textColor : _disabledTextColor,
+            ),
             decoration: InputDecoration(
+              filled: true,
+              fillColor: _backgroundTextColor,
               hintText: hintText,
-              hintStyle: TextStyle(color: Colors.grey),
-              fillColor: Colors.transparent,
+              hintStyle: TextStyle(color: Colors.grey, fontStyle: FontStyle.italic),
               border: OutlineInputBorder(),
-              focusedBorder: const OutlineInputBorder(
-                borderSide: BorderSide(color: Colors.orange, width: 3),
+              focusedBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: _focusColor, width: 2),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: _borderColor, width: 2),
               ),
             ),
             validator: (value) {
@@ -223,17 +242,17 @@ class _FloatingSettingsBoxState extends State<FloatingSettingsBox> {
     return Container(
       width: 500,
       decoration: BoxDecoration(
-          color: Colors.white,
-          boxShadow: [
-            BoxShadow(
-                offset: Offset.fromDirection(1, 2),
-                spreadRadius: 1,
-                blurRadius: 3,
-                color: Colors.grey)
-          ],
+          color: _backgroundColor,
+          // boxShadow: [
+          //   BoxShadow(
+          //       offset: Offset.fromDirection(1, 2),
+          //       spreadRadius: 1,
+          //       blurRadius: 3,
+          //       color: Colors.grey)
+          // ],
           borderRadius: const BorderRadius.all(Radius.circular(20)),
           border: Border.all(
-              color: Colors.orange,
+              color: _borderColor,
               width: 2,
               style: BorderStyle.solid)),
       child: Padding(
@@ -395,7 +414,7 @@ class _FloatingSettingsBoxState extends State<FloatingSettingsBox> {
                   children: [
                     Text(
                       'Connect screen',
-                      style: TextStyle(fontSize: 25.0, fontWeight: FontWeight(1000)),
+                      style: TextStyle(fontSize: 25.0, fontWeight: FontWeight(600), color: _textColor),
                     ),
                     // if (_connectionError != null)
                     //   Container(
@@ -465,7 +484,11 @@ class _FloatingSettingsBoxState extends State<FloatingSettingsBox> {
                         SizedBox(
                           height: 89,
                           child: Center(
-                            child: Text('  —  '),
+                            child: Text('  —  ', 
+                              style: TextStyle(
+                                color: (!_startReadOnly && !_isConnecting) ? _textColor : _disabledTextColor
+                              )
+                            ),
                           ),
                         ),
                         Expanded(
@@ -593,14 +616,48 @@ class _FloatingSettingsBoxState extends State<FloatingSettingsBox> {
                                   }
                                 }
                               },
+                              style: ButtonStyle(
+                                foregroundColor: WidgetStatePropertyAll<Color>(_textColor),
+                                backgroundColor: WidgetStateProperty<Color>.fromMap(
+                                  <WidgetStatesConstraint, Color>{
+                                    WidgetState.disabled: _disabledButtonIdleColor,
+                                    WidgetState.focused: _buttonFocusColor,
+                                    WidgetState.pressed | WidgetState.hovered: _buttonFocusColor,
+                                    WidgetState.any: _buttonIdleColor,
+                                  },
+                                ),
+                                side: WidgetStateProperty<BorderSide>.fromMap(
+                                  <WidgetStatesConstraint, BorderSide>{
+                                    WidgetState.disabled: BorderSide(color: _disabledButtonIdleColor),
+                                    WidgetState.focused: BorderSide(color: Colors.white),
+                                    WidgetState.pressed | WidgetState.hovered: BorderSide(color: Colors.white),
+                                    WidgetState.any: BorderSide(color: _buttonIdleColor),
+                                  },
+                                ),
+                              ),
                               child: const Text('Submit'),
                             ),
                           ) : Expanded(
                             child: ElevatedButton(
                               focusNode: _disconnectFocusNode,
                               style: ButtonStyle(
-                                backgroundColor: WidgetStatePropertyAll<Color>(Color.fromARGB(255, 255, 152, 152)),
-                                foregroundColor: WidgetStatePropertyAll<Color>(Colors.red)
+                                foregroundColor: WidgetStatePropertyAll<Color>(_textColor),
+                                backgroundColor: WidgetStateProperty<Color>.fromMap(
+                                  <WidgetStatesConstraint, Color>{
+                                    WidgetState.disabled: _disabledButtonIdleColor,
+                                    WidgetState.focused: Colors.red,
+                                    WidgetState.pressed | WidgetState.hovered: Colors.red,
+                                    WidgetState.any: Color.fromARGB(255, 255, 0, 0),
+                                  },
+                                ),
+                                side: WidgetStateProperty<BorderSide>.fromMap(
+                                  <WidgetStatesConstraint, BorderSide>{
+                                    WidgetState.disabled: BorderSide(color: _disabledButtonIdleColor),
+                                    WidgetState.focused: BorderSide(color: Colors.white),
+                                    WidgetState.pressed | WidgetState.hovered: BorderSide(color: Colors.white),
+                                    WidgetState.any: BorderSide(color: Color.fromARGB(255, 255, 0, 0)),
+                                  },
+                                ),
                               ),
                               onPressed: () async {
                                 await widget.onDisconnected();
@@ -627,6 +684,25 @@ class _FloatingSettingsBoxState extends State<FloatingSettingsBox> {
                             child: ElevatedButton(
                               focusNode: _cancelFocusNode,
                               onPressed: _disableCancel ? null : widget.onCloseSettings,
+                              style: ButtonStyle(
+                                foregroundColor: WidgetStatePropertyAll<Color>(_textColor),
+                                backgroundColor: WidgetStateProperty<Color>.fromMap(
+                                  <WidgetStatesConstraint, Color>{
+                                    WidgetState.disabled: _disabledButtonIdleColor,
+                                    WidgetState.focused: _buttonFocusColor,
+                                    WidgetState.pressed | WidgetState.hovered: _buttonFocusColor,
+                                    WidgetState.any: _buttonIdleColor,
+                                  },
+                                ),
+                                side: WidgetStateProperty<BorderSide>.fromMap(
+                                  <WidgetStatesConstraint, BorderSide>{
+                                    WidgetState.disabled: BorderSide(color: _disabledButtonIdleColor),
+                                    WidgetState.focused: BorderSide(color: Colors.white),
+                                    WidgetState.pressed | WidgetState.hovered: BorderSide(color: Colors.white),
+                                    WidgetState.any: BorderSide(color: _buttonIdleColor),
+                                  },
+                                ),
+                              ),
                               child: const Text('Cancel'),
                             ),
                           ),
