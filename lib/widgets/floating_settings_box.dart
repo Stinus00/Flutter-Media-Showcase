@@ -25,7 +25,7 @@ class FloatingSettingsBox extends StatefulWidget {
   State<FloatingSettingsBox> createState() => _FloatingSettingsBoxState();
 }
 
-enum TextInputTypeCustom {email, password, code, text}
+enum TextInputTypeCustom {email, password, code, text, none}
 
 class _FloatingSettingsBoxState extends State<FloatingSettingsBox> {
 
@@ -120,7 +120,6 @@ class _FloatingSettingsBoxState extends State<FloatingSettingsBox> {
     String formaterRegex = r'.',
     int minLength = -1,
     int maxLength = -1,
-    String errorMessage = '',
   }) {
     TextInputType inputType = TextInputType.text;
 

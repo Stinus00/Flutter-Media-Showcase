@@ -319,7 +319,7 @@ class MediaDownloader {
     required String link,
     required String name,
     required List<String> tickerStrings,
-    void Function(int received, int total)? onReceiveProgress,
+    // void Function(int received, int total)? onReceiveProgress,
   }) async {
     final directory = await downloadDirectory;
     final tickerDirectory = Directory('${directory.path}/tickers');
