@@ -56,7 +56,7 @@ class _ActivityMonitorState extends State<ActivityMonitor> {
 
   void _startFastTimer() {
     _showSettingsTimer?.cancel();
-    _showSettingsTimer = Timer(const Duration(seconds: 3), () {
+    _showSettingsTimer = Timer(const Duration(milliseconds: 3500), () {
       if(!mounted) return;
       _setButtonsVisible(false);
     });

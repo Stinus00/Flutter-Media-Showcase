@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:dio/dio.dart';
 import 'package:email_validator/email_validator.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -32,16 +33,13 @@ class _FloatingSettingsBoxState extends State<FloatingSettingsBox> {
   final _formKey = GlobalKey<FormState>();
   final FocusScopeNode _settingsFocusScope = FocusScopeNode();
   final FocusNode _settingsMenuFocusNode = FocusNode();
-  //unused
-  final FocusNode _emailFocusNode = FocusNode();
-  //unused
-  final FocusNode _passwordFocusNode = FocusNode();
   final FocusNode _systemIdFocusNode = FocusNode();
   final FocusNode _mccId1FocusNode = FocusNode();
   final FocusNode _mccId2FocusNode = FocusNode();
   final FocusNode _submitFocusNode = FocusNode();
   final FocusNode _disconnectFocusNode = FocusNode();
   final FocusNode _cancelFocusNode = FocusNode();
+  final FocusNode _closeFocusNode = FocusNode();
 
   final _systemIdController = TextEditingController();
   final _mccId1Controller = TextEditingController();
@@ -293,6 +291,7 @@ class _FloatingSettingsBoxState extends State<FloatingSettingsBox> {
                 }
 
                 List<FocusNode> focusNodes = [
+                  _closeFocusNode,
                   _systemIdFocusNode,
                   _mccId1FocusNode,
                   _mccId2FocusNode,
@@ -301,6 +300,7 @@ class _FloatingSettingsBoxState extends State<FloatingSettingsBox> {
                 ];
                 if(_startReadOnly) {
                   focusNodes = [
+                    _closeFocusNode,
                     _disconnectFocusNode,
                     _cancelFocusNode,
                   ];
@@ -308,16 +308,16 @@ class _FloatingSettingsBoxState extends State<FloatingSettingsBox> {
                 final currentIndex =
                     focusNodes.indexWhere((focusNode) => focusNode.hasFocus);
                 // Check if any of the nodes highlighted is in a row
-                if (( focusNodes[currentIndex] == _submitFocusNode ||
-                      focusNodes[currentIndex] == _cancelFocusNode ||
-                      focusNodes[currentIndex] == _mccId1FocusNode ||
-                      focusNodes[currentIndex] == _mccId2FocusNode || 
-                      focusNodes[currentIndex] == _disconnectFocusNode ) && (
-                        event.logicalKey == LogicalKeyboardKey.arrowUp ||
+                if (    currentIndex >= 0 &&
+                   (    focusNodes[currentIndex] == _submitFocusNode ||
+                        focusNodes[currentIndex] == _cancelFocusNode ||
+                        focusNodes[currentIndex] == _mccId1FocusNode ||
+                        focusNodes[currentIndex] == _mccId2FocusNode ||
+                        focusNodes[currentIndex] == _disconnectFocusNode) &&
+                   (    event.logicalKey == LogicalKeyboardKey.arrowUp ||
                         event.logicalKey == LogicalKeyboardKey.arrowDown ||
                         event.logicalKey == LogicalKeyboardKey.arrowLeft ||
-                        event.logicalKey == LogicalKeyboardKey.arrowRight
-                      )) {
+                        event.logicalKey == LogicalKeyboardKey.arrowRight)) {
                   if (focusNodes[currentIndex] == _submitFocusNode) {
                     if (event.logicalKey == LogicalKeyboardKey.arrowRight) {
                       _cancelFocusNode.requestFocus();
@@ -333,8 +333,11 @@ class _FloatingSettingsBoxState extends State<FloatingSettingsBox> {
                       _cancelFocusNode.requestFocus();
                     } else
                     if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
-                      if (focusNodes.contains(_mccId1FocusNode)) {
+                      if (focusNodes.contains(_mccId1FocusNode) && _mccId1FocusNode.canRequestFocus) {
                         _mccId1FocusNode.requestFocus();
+                      } else
+                      if (focusNodes.contains(_closeFocusNode)) {
+                        _closeFocusNode.requestFocus();
                       }
                     }
                   } else
@@ -348,8 +351,11 @@ class _FloatingSettingsBoxState extends State<FloatingSettingsBox> {
                       }
                     } else
                     if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
-                      if (focusNodes.contains(_mccId2FocusNode)) {
+                      if (focusNodes.contains(_mccId2FocusNode) && _mccId2FocusNode.canRequestFocus) {
                         _mccId2FocusNode.requestFocus();
+                      } else
+                      if (focusNodes.contains(_closeFocusNode)) {
+                        _closeFocusNode.requestFocus();
                       }
                     }
                   } else
@@ -379,10 +385,11 @@ class _FloatingSettingsBoxState extends State<FloatingSettingsBox> {
                 }
 
                 if (!_isEditing &&
-                    (event.logicalKey == LogicalKeyboardKey.select ||
-                        event.logicalKey == LogicalKeyboardKey.enter ||
-                        event.logicalKey == LogicalKeyboardKey.numpadEnter) &&
+                   (event.logicalKey == LogicalKeyboardKey.select ||
+                    event.logicalKey == LogicalKeyboardKey.enter  ||
+                    event.logicalKey == LogicalKeyboardKey.numpadEnter) &&
                     currentIndex >= 0 &&
+                    focusNodes[currentIndex] != _closeFocusNode &&
                     currentIndex < focusNodes.length - 2) {
                   _beginEditing(focusNodes[currentIndex]);
                   return KeyEventResult.handled;
@@ -414,47 +421,58 @@ class _FloatingSettingsBoxState extends State<FloatingSettingsBox> {
                 child: ListView(
                   shrinkWrap: true,
                   children: [
-                    Text(
-                      'Connect screen',
-                      style: TextStyle(fontSize: 25.0, fontWeight: FontWeight(600), color: _textColor),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Connect screen',
+                          style: TextStyle(fontSize: 25.0, fontWeight: FontWeight(600), color: _textColor),
+                        ),
+                        ElevatedButton(
+                          focusNode: _closeFocusNode,
+                          onPressed: widget.onCloseSettings,
+                          style: ButtonStyle(
+                            foregroundColor: WidgetStatePropertyAll<Color>(_textColor),
+                            backgroundColor: WidgetStateProperty<Color>.fromMap(
+                              <WidgetStatesConstraint, Color>{
+                                WidgetState.any: Colors.transparent,
+                              },
+                            ),
+                            side: WidgetStateProperty<BorderSide>.fromMap(
+                              <WidgetStatesConstraint, BorderSide>{
+                                WidgetState.pressed: BorderSide(color: Colors.white, width: _buttonBorderWidth),
+                                WidgetState.focused | WidgetState.hovered: BorderSide(color: Colors.white, width: _buttonBorderWidth),
+                                WidgetState.any: BorderSide(color: Colors.transparent),
+                              },
+                            ),
+                          ),
+                          child: Text('X'),
+                        )
+                      ],
                     ),
-                    // if (_connectionError != null)
-                    //   Container(
-                    //     margin: const EdgeInsets.symmetric(vertical: 12),
-                    //     padding: const EdgeInsets.all(12),
-                    //     decoration: BoxDecoration(
-                    //       color: Colors.red.shade50,
-                    //       border: Border.all(color: Colors.red.shade300),
-                    //       borderRadius: BorderRadius.circular(8),
-                    //     ),
-                    //     child: Row(
-                    //       crossAxisAlignment: CrossAxisAlignment.start,
-                    //       children: [
-                    //         Icon(Icons.error_outline, color: Colors.red.shade700),
-                    //         const SizedBox(width: 8),
-                    //         Expanded(
-                    //           child: Text(
-                    //             'Could not prepare media:\n$_connectionError',
-                    //             style: TextStyle(color: Colors.red.shade900),
-                    //           ),
-                    //         ),
-                    //       ],
-                    //     ),
-                    //   ),
-                    // _buildTextInput(
-                    //   text: 'Email',
-                    //   hintText: 'example@email.com',
-                    //   type: TextInputTypeCustom.email,
-                    //   focusNode: _emailFocusNode,
-                    // ),
-                    // _buildTextInput(
-                    //   text: 'Password',
-                    //   hintText: '*********',
-                    //   type: TextInputTypeCustom.password,
-                    //   focusNode: _passwordFocusNode,
-                    //   obscureText: true,
-                    //   obscureCharacter: '*',
-                    // ),
+                    if (_connectionError != null)
+                      Container(
+                        margin: const EdgeInsets.symmetric(vertical: 12),
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.red.shade50,
+                          border: Border.all(color: Colors.red.shade300),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Icon(Icons.error_outline, color: Colors.red.shade700),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'Could not prepare media:\n$_connectionError',
+                                style: TextStyle(color: Colors.red.shade900),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     _buildTextInput(
                       text: 'Systeem ID',
                       hintText: '123123123123',
@@ -535,9 +553,10 @@ class _FloatingSettingsBoxState extends State<FloatingSettingsBox> {
                                       ).closed;
                                   try {
                                     if (!mounted) return;
-                                    if(await widget.tryConnect(_systemIdController.text) == false) {
-                                      throw Exception("Couldn't connect");
-                                    }
+                                    await widget.tryConnect(_systemIdController.text);
+                                    // if(await widget.tryConnect(_systemIdController.text) == false) {
+                                    //   throw Exception("Couldn't connect");
+                                    // }
 
                                     setState(() {
                                       _disableCancel = true;
@@ -592,25 +611,33 @@ class _FloatingSettingsBoxState extends State<FloatingSettingsBox> {
                                     });
 
                                   } catch (error) {
+
                                     messenger.hideCurrentSnackBar();
                                     await _file.storeIds(
                                       mccAppId: '',
                                       systemId: '',
                                     );
 
-                                    await messenger
+                                    messenger
                                         .showSnackBar(
                                           const SnackBar(
                                             content: Text("Couldn't connect"),
                                             backgroundColor: Colors.red,
                                             duration: Duration(seconds: 3),
                                           ),
-                                        )
-                                        .closed;
+                                        );
 
                                     if (!mounted) return;
                                     setState(() {
-                                      _connectionError = error.toString();
+                                      if(error is DioException) {
+                                        if(error.response?.statusCode == 404) {
+                                          _connectionError = 'System ID not found. Check again if its the right id.\nError: ${error.response?.statusCode}';
+                                        } else {
+                                          _connectionError = '${error.response?.statusMessage}\nError: ${error.response?.statusCode}';
+                                        }
+                                      } else {
+                                        _connectionError = error.toString();
+                                      }
                                       _isConnecting = false;
                                     });
                                   }
@@ -723,14 +750,13 @@ class _FloatingSettingsBoxState extends State<FloatingSettingsBox> {
   void dispose() {
     _settingsFocusScope.dispose();
     _settingsMenuFocusNode.dispose();
-    _emailFocusNode.dispose();
-    _passwordFocusNode.dispose();
     _systemIdFocusNode.dispose();
     _mccId1FocusNode.dispose();
     _mccId2FocusNode.dispose();
     _submitFocusNode.dispose();
     _disconnectFocusNode.dispose();
     _cancelFocusNode.dispose();
+    _closeFocusNode.dispose();
 
     _mccId1Controller.dispose();
     _mccId2Controller.dispose();

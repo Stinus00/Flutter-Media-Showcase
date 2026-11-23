@@ -1,9 +1,17 @@
 class ApiException implements Exception {
-  final int statusCode;
-  final String message;
+  final int? statusCode;
+  final String? message;
 
   ApiException(this.statusCode, this.message);
 
   @override
   String toString() => 'ApiException($statusCode): $message';
+}
+
+class ScreenError {
+  final int? statusCode;
+  final String? message;
+  final String? instructions;
+
+  ScreenError(this.statusCode, this.message, this.instructions);
 }

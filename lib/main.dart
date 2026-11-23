@@ -6,7 +6,10 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_video_test/classes/errors.dart';
 import 'package:flutter_video_test/classes/frame_ticker_position.dart';
+import 'package:flutter_video_test/classes/system_data_login_file.dart';
+import 'package:flutter_video_test/sources/media_sources.dart';
 import 'package:flutter_video_test/widgets/activity_monitor.dart';
 import 'package:flutter_video_test/widgets/floating_settings_box.dart';
 import 'package:video_player/video_player.dart';
@@ -70,7 +73,10 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
   // Errors
   String? _imageError;
   String? _videoError;
-  String? _preloadError;
+  ApiException? _preloadError;
+  ApiException? _payloadError;
+  ApiException? _criticalErrorHandlingScheduledFor;
+  ApiException? _criticalErrorHandledFor;
 
   // Global booleans
   bool _isChangingVideo = false;
@@ -193,10 +199,13 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
       setState(() {
         _isPreparingMedia = true;
         _preloadError = null;
+        _criticalErrorHandledFor = null;
       });
     }
 
     try {
+      await SystemDataLoginFile().storeUuid();
+
       if (_mediaLinks.isEmpty) {
         _mediaLinks = await _apiCall.getMediaFromApi(
           onProgress: (completed, total) =>
@@ -258,18 +267,31 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
           await _initializeFrame();
           return;
         }
+      } else if (error.type == DioExceptionType.connectionError) {
+        _preloadError = ApiException(480, 'No internet connection');
       }
 
       setState(() {
         _isPreparingMedia = false;
-        _preloadError = error.toString();
+        _preloadError = ApiException(
+          error.response?.statusCode,
+          error.response?.statusMessage,
+        );
       });
+    } on ApiException catch (error) {
+      print('Error found: $error');
+      if (mounted) {
+        setState(() {
+          _isPreparingMedia = false;
+          _preloadError = error;
+        });
+      }
     } catch (error) {
       print('Error found: $error');
       if (mounted) {
         setState(() {
           _isPreparingMedia = false;
-          _preloadError = error.toString();
+          _preloadError = ApiException(0, error.toString());
         });
       }
     }
@@ -285,6 +307,7 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
     _tickerCheckTimer?.cancel();
 
     _scheduleCheckTimer = Timer.periodic(const Duration(minutes: 1), (_) {
+      // 1 minute
       // Check if schedules have changed
       if (_mediaLinks.isEmpty) {
         setState(() {
@@ -298,6 +321,7 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
       }
     });
     _payloadCheckTimer = Timer.periodic(const Duration(minutes: 15), (_) {
+      // 15 minutes
       // Check if API callback has changed
       if (_hasNetworkConnection == true) {
         if (_mediaLinks.isEmpty) {
@@ -313,6 +337,7 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
       }
     });
     _tickerCheckTimer = Timer.periodic(const Duration(minutes: 10), (_) async {
+      // 10 minutes
       // Check if tickersources have changed
       if (_hasNetworkConnection == true) {
         final updatedTickerLinks = await _apiCall
@@ -366,6 +391,62 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
       y1 = null;
       y2 = null;
       creationType = null;
+    });
+
+    _preloadError = ApiException(600, 'No System ID found');
+  }
+
+  Future<void> _onCriticalError() async {
+    if (!mounted) return;
+
+    _scheduleCheckTimer?.cancel();
+    _payloadCheckTimer?.cancel();
+    _tickerCheckTimer?.cancel();
+
+    _scheduleCheckTimer = null;
+    _payloadCheckTimer = null;
+    _tickerCheckTimer = null;
+
+    _imageTimer?.cancel();
+    _frameTimer?.cancel();
+    _controller?.dispose();
+
+    setState(() {
+      _mediaLinks = [];
+      _frameLinks = [];
+      _tickerLinksMain = [];
+      _tickerLinksSecondary = [];
+      tickerMain = [];
+      tickerSecondary = [];
+
+      frameTickerPositions = [];
+
+      _currentLinkIndex = 0;
+      _currentLinkIndexFrame = 0;
+
+      x1 = null;
+      x2 = null;
+      y1 = null;
+      y2 = null;
+      creationType = null;
+    });
+  }
+
+  void _scheduleCriticalErrorHandling(ApiException error) {
+    if (identical(error, _criticalErrorHandlingScheduledFor) ||
+        identical(error, _criticalErrorHandledFor)) {
+      return;
+    }
+
+    _criticalErrorHandlingScheduledFor = error;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (identical(_criticalErrorHandlingScheduledFor, error)) {
+        _criticalErrorHandlingScheduledFor = null;
+      }
+      if (!mounted || !identical(_preloadError, error)) return;
+
+      _criticalErrorHandledFor = error;
+      unawaited(_onCriticalError());
     });
   }
 
@@ -441,6 +522,12 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
       }
     } catch (error) {
       debugPrint('Error checking for media changes: $error');
+      if (error is DioException) {
+        _preloadError = ApiException(
+          error.response?.statusCode,
+          error.response?.statusMessage,
+        );
+      }
     } finally {
       _isChangingVideo = false;
       _isCheckingForChanges = false;
@@ -990,13 +1077,9 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
                   AnimatedSwitcher(
                     duration: const Duration(milliseconds: 200),
                     transitionBuilder: (child, animation) {
-                      return FadeTransition(
-                        opacity: animation,
-                        child: child,
-                      );
+                      return FadeTransition(opacity: animation, child: child);
                     },
                     child: _showButtons ? _buildButtonShowcase() : null,
-
                   ),
                   if (_showSettings)
                     FloatingSettingsBox(
@@ -1007,7 +1090,7 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
                         );
                         final error = _preloadError;
                         if (error != null) {
-                          throw StateError(error);
+                          throw error;
                         }
                       },
                       onDisconnected: () => _onDisconnect(),
@@ -1067,7 +1150,7 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
     return Stack(
       alignment: Alignment.bottomCenter,
       children: [
-        _buildMediaContent(),
+        _buildMediaContent(mediaHeight),
         if (frameTickerPositions.isEmpty) ...[
           Positioned(
             key: ValueKey(1),
@@ -1110,7 +1193,7 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
     );
   }
 
-  Widget _buildMediaContent() {
+  Widget _buildMediaContent(double mediaHeight) {
     if (_isPreparingMedia) {
       return const CircularProgressIndicator();
     }
@@ -1129,12 +1212,128 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
           width: double.infinity,
         );
       }
-      return Image.asset(
-        'assets/placeholder-green.png',
-        fit: BoxFit.contain,
-        height: double.infinity,
-        width: double.infinity,
-      );
+
+      ScreenError? screenError;
+
+      switch (_preloadError!.statusCode) {
+        case 403:
+          _scheduleCriticalErrorHandling(_preloadError!);
+          screenError = ScreenError(
+            403, 
+            'Another screen is already connected to the BCM Media Control Center (MCC) with the current code.', 
+            'Open settings to setup a new connection'
+          );
+          break;
+        case 404:
+          _scheduleCriticalErrorHandling(_preloadError!);
+          screenError = ScreenError(
+            404, 
+            'Unable to connect with the BCM Media Control Center (MCC)', 
+            'Open settings to setup a new connection'
+          );
+          break;
+        case 408:
+          if (mediaLinks.isEmpty) {
+            screenError = ScreenError(
+              408, 
+              'Unable to retrieve content from the BCM Media Control Center (MCC)', 
+              'No content to show'
+            );
+          }
+          break;
+        case 480:
+          if (mediaLinks.isEmpty) {
+            screenError = ScreenError(
+              480, 
+              'Unable to refresh.\nPlease check internet connection', 
+              'No content to show'
+            );
+          }
+          break;
+        case 500:
+          if (mediaLinks.isEmpty) {
+            screenError = ScreenError(
+              500, 
+              'Unable to retrieve content from the BCM Media Control Center (MCC)', 
+              'No content to show'
+            );
+          }
+          break;
+        case 600:
+          screenError = ScreenError(
+            600, 
+            'Not connected with BCM Media Control Center (MCC)', 
+            'Please connect this screen with your environment of the MCC'
+          );
+          break;
+        default:
+          screenError = ScreenError(
+            0, 
+            'No content available', 
+            ''
+          );
+      }
+    
+      if (screenError != null) {
+        return Container(
+          width: 500,
+          height: mediaHeight,
+          decoration: BoxDecoration(border: Border.all()),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Text(// Logo (REPLACE)
+                      'BCM Logo',
+                      style: TextStyle(
+                        color: Color.fromARGB(255, 255, 98, 0),
+                        fontWeight: FontWeight(1000),
+                        fontSize: 50,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    Text( // Error message
+                      // Message
+                      '${screenError.message}',
+                      style: TextStyle(
+                        color: Color.fromARGB(255, 255, 98, 0),
+                        fontWeight: FontWeight(1000),
+                        fontSize: 30,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    Text(''),
+                    Text( // Instructions message
+                      // Message
+                      '${screenError.instructions}',
+                      style: TextStyle(
+                        color: Color.fromARGB(255, 255, 133, 57),
+                        fontWeight: FontWeight(1000),
+                        fontSize: 20,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              ),
+              if(screenError.statusCode != 0)
+                Align( // Status code
+                  alignment: Alignment.bottomLeft,
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Text(
+                      'Error ${screenError.statusCode}',
+                      style: const TextStyle(color: Colors.grey, fontSize: 20),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        );
+      }
     }
 
     // If there's a video error, skip media and display the error temporarily.
@@ -1225,11 +1424,29 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
     });
   }
 
+  bool _checkForPreloadError() {
+    switch (_preloadError?.statusCode) {
+      case 403 || 404:
+        _scheduleCriticalErrorHandling(_preloadError!);
+        return true;
+      case 408 || 480 || 500:
+        if (mediaLinks.isEmpty) {
+          return true;
+        }
+        return false;
+      case 600:
+        return true;
+      default:
+        return true;
+    }
+  }
+
+  // Build frames
   Widget _buildMediaFrame() {
     if (_isPreparingMedia) {
       return const CircularProgressIndicator();
     }
-    if (_preloadError != null) {
+    if (_preloadError != null && _checkForPreloadError()) {
       return Padding(
         padding: const EdgeInsets.all(24),
         child: Text(
@@ -1271,6 +1488,7 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
           );
   }
 
+  // Build tickers
   Widget _buildTickers(
     double mediaHeight,
     List<String> tickerString, {
@@ -1311,6 +1529,7 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
     );
   }
 
+  // Build the screen to show all buttons
   Widget _buildButtonShowcase() {
     Color gradientColor = Colors.black;
     Color buttonColor = Colors.deepOrange;
@@ -1318,7 +1537,8 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
 
     return Stack(
       children: [
-        Container( // Gradient Top
+        Container(
+          // Gradient Top
           decoration: BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.topCenter,
@@ -1331,7 +1551,8 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
             ),
           ),
         ),
-        Container( // Gradient Bottom
+        Container(
+          // Gradient Bottom
           decoration: BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.bottomCenter,
@@ -1355,7 +1576,7 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
           top: 16,
           child: _buildSettingsButton(buttonColor, buttonHoverColor),
         ),
-      ]
+      ],
     );
   }
 
@@ -1379,7 +1600,8 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
           shape: RoundedRectangleBorder(
             side: BorderSide(
               width: 3,
-              color: _isNextPlaylistButtonHovered ||
+              color:
+                  _isNextPlaylistButtonHovered ||
                       _nextPlaylistButtonFocusNode.hasFocus
                   ? Colors.white
                   : Colors.transparent,
@@ -1421,7 +1643,7 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
         onEnter: (_) => setState(() => _isSettingsButtonHovered = true),
         onExit: (_) => setState(() => _isSettingsButtonHovered = false),
         child: FloatingActionButton.extended(
-        key: const ValueKey('settings-button'),
+          key: const ValueKey('settings-button'),
           focusNode: _settingsButtonFocusNode,
           backgroundColor: buttonColor,
           focusColor: hoverColor,
@@ -1429,8 +1651,8 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
           shape: RoundedRectangleBorder(
             side: BorderSide(
               width: 3,
-              color: _isSettingsButtonHovered ||
-                      _settingsButtonFocusNode.hasFocus
+              color:
+                  _isSettingsButtonHovered || _settingsButtonFocusNode.hasFocus
                   ? Colors.white
                   : Colors.transparent,
             ),

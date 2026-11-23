@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_video_test/classes/api_mcc_data.dart';
 import 'package:flutter_video_test/cache_download/media_cache_deletion.dart';
 import 'package:flutter_video_test/api/api_xml_handler.dart';
+import 'package:flutter_video_test/classes/errors.dart';
 import 'package:flutter_video_test/classes/frame_link.dart';
 import 'package:flutter_video_test/cache_download/media_cacher_stub.dart'
     if (dart.library.js_interop) 'package:flutter_video_test/cache_download/media_cacher.dart';
@@ -62,7 +63,7 @@ class ApiCall {
     String fullSystemId = '${systemId}_1';
     final secrets = await _getSecrets();
 
-    try {
+    // try {
       _dio.options.headers[secrets['api_header']] = secrets['api_key'];
 
       final url = 'https://api.mediacontrolcenter.com/api/v1/system/$fullSystemId/export-full';
@@ -73,9 +74,9 @@ class ApiCall {
       } else {
         throw Exception('Failed to load JSON from $url');
       }
-    } catch (e) {
-      return false;
-    }
+    // } catch (e) {
+    //   return false;
+    // }
   }
   
   // Get data from URL
@@ -507,7 +508,7 @@ class ApiCall {
           if( !_isNumeric(split[0]) || split[0].length != 12 ||
               !_isNumeric(split[1]) || split[1].length != 1
           ) {
-            throw Exception('System id not following requirements');
+            throw ApiException(600, 'System id not following requirements');
           }
         }
         // var mccIds = ids.$1.split('-');
@@ -517,7 +518,7 @@ class ApiCall {
         // }
       }
 
-      if(systemId.isEmpty) throw Exception('No SystemID found.');
+      if(systemId.isEmpty) throw ApiException(600 ,'No SystemID found.');
 
       _dio.options.headers['X-BCM-API-KEY'] = secrets['api_key'];
       _dio.options.headers['X-BCM-UUID'] = '0000-0000';
