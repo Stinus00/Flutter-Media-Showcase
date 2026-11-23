@@ -979,18 +979,8 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
                     )
                   else
                     Center(child: _buildMedia(canvasHeight * scale)),
-                  if (_showButtons)
-                    Positioned(
-                      right: 16,
-                      bottom: 16,
-                      child: _buildNextPlaylistButton(),
-                    ),
-                  if (_showButtons)
-                    Positioned(
-                      right: 16,
-                      top: 16,
-                      child: _buildSettingsButton(),
-                    ),
+                  if(_showButtons)
+                    _buildButtonShowcase(),
                   if (_showSettings)
                     FloatingSettingsBox(
                       onConnected: (onProgress) async {
@@ -1301,6 +1291,50 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
       borderColor: borderColor,
       borderWidth: borderWidth,
       textColor: textColor,
+    );
+  }
+
+  Widget _buildButtonShowcase() {
+    return Stack(
+      children: [
+        Container( // Gradient Top
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment(0, 1),
+              colors: <Color>[
+                Colors.black,
+                Color.fromARGB(0, 0, 0, 0),
+                Color.fromARGB(0, 0, 0, 0),
+              ], // Gradient from https://learnui.design/tools/gradient-generator.html
+            ),
+          ),
+        ),
+        Container( // Gradient Bottom
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.bottomCenter,
+              end: Alignment(0, -0.1),
+              colors: <Color>[
+                Colors.black,
+                Color.fromARGB(0, 0, 0, 0),
+                Color.fromARGB(0, 0, 0, 0),
+              ], // Gradient from https://learnui.design/tools/gradient-generator.html
+            ),
+          ),
+        ),
+
+        Positioned(
+          right: 16,
+          bottom: 16,
+          child: _buildNextPlaylistButton(),
+        ),
+        Positioned(
+          right: 16,
+          top: 16,
+          child: _buildSettingsButton(),
+        ),
+      ]
     );
   }
 

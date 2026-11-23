@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:web/web.dart';
 
 class ActivityMonitor extends StatefulWidget {
   const ActivityMonitor({
@@ -38,7 +39,11 @@ class _ActivityMonitorState extends State<ActivityMonitor> {
   }
 
   void _updateActivity() {
-    _startIdleTimer();
+    if(widget.isSettingsOpen) {
+      _stopIdleTimer();
+    } else {
+      _startIdleTimer();
+    }
     _setButtonsVisible(true);
   }
 
@@ -50,10 +55,27 @@ class _ActivityMonitorState extends State<ActivityMonitor> {
     });
   }
 
+  void _stopIdleTimer() {
+    _showSettingsTimer?.cancel();
+  }
+
   @override
   void initState() {
     super.initState();
     _startIdleTimer();
+  }
+
+  @override
+  void didUpdateWidget(covariant ActivityMonitor oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    if (widget.isSettingsOpen != oldWidget.isSettingsOpen) {
+      if (widget.isSettingsOpen) {
+        _stopIdleTimer();
+      } else {
+        _startIdleTimer();
+      }
+    }
   }
 
   @override

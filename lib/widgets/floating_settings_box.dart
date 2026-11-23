@@ -528,9 +528,7 @@ class _FloatingSettingsBoxState extends State<FloatingSettingsBox> {
                                       .showSnackBar(
                                         SnackBar(
                                           content: const Text('Connecting...'),
-                                          duration: Duration(
-                                            seconds: 2,
-                                          ),
+                                          duration: Duration(seconds: 3),
                                         ),
                                       ).closed;
                                   try {
