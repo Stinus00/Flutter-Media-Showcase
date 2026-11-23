@@ -78,6 +78,8 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
   bool _isPreparingMedia = true;
   bool _showButtons = true;
   bool _showSettings = false;
+  bool _isNextPlaylistButtonHovered = false;
+  bool _isSettingsButtonHovered = false;
   int _currentLinkIndex = 0;
   int _currentLinkIndexFrame = 0;
   int? _videoErrorIndex;
@@ -117,6 +119,8 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
+    _nextPlaylistButtonFocusNode.addListener(_handleButtonFocusChange);
+    _settingsButtonFocusNode.addListener(_handleButtonFocusChange);
     unawaited(WakelockPlus.enable());
     if (kIsWeb) {
       _reloadTimer = Timer(const Duration(hours: 12), reloadPage);
@@ -138,6 +142,10 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
     );
     unawaited(_checkConnectivity());
     unawaited(_prepareMedia(startChangeChecks: true));
+  }
+
+  void _handleButtonFocusChange() {
+    if (mounted) setState(() {});
   }
 
   Future<void> _checkConnectivity() async {
@@ -979,8 +987,17 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
                     )
                   else
                     Center(child: _buildMedia(canvasHeight * scale)),
-                  if(_showButtons)
-                    _buildButtonShowcase(),
+                  AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 200),
+                    transitionBuilder: (child, animation) {
+                      return FadeTransition(
+                        opacity: animation,
+                        child: child,
+                      );
+                    },
+                    child: _showButtons ? _buildButtonShowcase() : null,
+
+                  ),
                   if (_showSettings)
                     FloatingSettingsBox(
                       onConnected: (onProgress) async {
@@ -1295,15 +1312,19 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
   }
 
   Widget _buildButtonShowcase() {
+    Color gradientColor = Colors.black;
+    Color buttonColor = Colors.deepOrange;
+    Color buttonHoverColor = Colors.deepOrangeAccent;
+
     return Stack(
       children: [
         Container( // Gradient Top
-          decoration: const BoxDecoration(
+          decoration: BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.topCenter,
               end: Alignment(0, 1),
               colors: <Color>[
-                Colors.black,
+                gradientColor,
                 Color.fromARGB(0, 0, 0, 0),
                 Color.fromARGB(0, 0, 0, 0),
               ], // Gradient from https://learnui.design/tools/gradient-generator.html
@@ -1311,14 +1332,14 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
           ),
         ),
         Container( // Gradient Bottom
-          decoration: const BoxDecoration(
+          decoration: BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.bottomCenter,
-              end: Alignment(0, -0.1),
+              end: const Alignment(0, -0.1),
               colors: <Color>[
-                Colors.black,
-                Color.fromARGB(0, 0, 0, 0),
-                Color.fromARGB(0, 0, 0, 0),
+                gradientColor,
+                const Color.fromARGB(0, 0, 0, 0),
+                const Color.fromARGB(0, 0, 0, 0),
               ], // Gradient from https://learnui.design/tools/gradient-generator.html
             ),
           ),
@@ -1327,76 +1348,104 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
         Positioned(
           right: 16,
           bottom: 16,
-          child: _buildNextPlaylistButton(),
+          child: _buildNextPlaylistButton(buttonColor, buttonHoverColor),
         ),
         Positioned(
           right: 16,
           top: 16,
-          child: _buildSettingsButton(),
+          child: _buildSettingsButton(buttonColor, buttonHoverColor),
         ),
       ]
     );
   }
 
   // Button to re-ask API data for testing
-  Widget _buildNextPlaylistButton() {
+  Widget _buildNextPlaylistButton(Color buttonColor, Color hoverColor) {
     return AnimatedSwitcher(
       duration: const Duration(milliseconds: 250),
       transitionBuilder: (child, animation) => ScaleTransition(
         scale: animation,
         child: FadeTransition(opacity: animation, child: child),
       ),
-      child: FloatingActionButton.extended(
-        key: const ValueKey('next-playlist-button'),
-        focusNode: _nextPlaylistButtonFocusNode,
-        backgroundColor: const Color.fromARGB(98, 59, 128, 255),
-        focusColor: const Color.fromARGB(95, 122, 169, 255),
-        hoverColor: const Color.fromARGB(95, 122, 169, 255),
-        foregroundColor: Colors.white,
-        elevation: 0,
-        onPressed: () {
-          if (_isPreparingMedia) return;
+      child: MouseRegion(
+        onEnter: (_) => setState(() => _isNextPlaylistButtonHovered = true),
+        onExit: (_) => setState(() => _isNextPlaylistButtonHovered = false),
+        child: FloatingActionButton.extended(
+          key: const ValueKey('next-playlist-button'),
+          focusNode: _nextPlaylistButtonFocusNode,
+          backgroundColor: buttonColor,
+          focusColor: hoverColor,
+          hoverColor: hoverColor,
+          shape: RoundedRectangleBorder(
+            side: BorderSide(
+              width: 3,
+              color: _isNextPlaylistButtonHovered ||
+                      _nextPlaylistButtonFocusNode.hasFocus
+                  ? Colors.white
+                  : Colors.transparent,
+            ),
+            borderRadius: BorderRadiusGeometry.circular(10),
+          ),
+          foregroundColor: Colors.white,
+          elevation: 0,
+          onPressed: () {
+            if (_isPreparingMedia) return;
 
-          if (_mediaLinks.isEmpty) {
-            setState(() {
-              _preloadError = null;
-            });
-            unawaited(_checkForMediaChanges(checkPayload: true));
-          } else {
-            setState(() {
-              _checkPayload = true;
-            });
-          }
-        },
-        icon: const Icon(Icons.play_arrow),
-        label: const Text('Refresh A'),
+            if (_mediaLinks.isEmpty) {
+              setState(() {
+                _preloadError = null;
+              });
+              unawaited(_checkForMediaChanges(checkPayload: true));
+            } else {
+              setState(() {
+                _checkPayload = true;
+              });
+            }
+          },
+          icon: const Icon(Icons.play_arrow),
+          label: const Text('Refresh A'),
+        ),
       ),
     );
   }
 
   // Button to open settings
-  Widget _buildSettingsButton() {
+  Widget _buildSettingsButton(Color buttonColor, Color hoverColor) {
     return AnimatedSwitcher(
       duration: const Duration(milliseconds: 250),
       transitionBuilder: (child, animation) => ScaleTransition(
         scale: animation,
         child: FadeTransition(opacity: animation, child: child),
       ),
-      child: FloatingActionButton.extended(
+      child: MouseRegion(
+        onEnter: (_) => setState(() => _isSettingsButtonHovered = true),
+        onExit: (_) => setState(() => _isSettingsButtonHovered = false),
+        child: FloatingActionButton.extended(
         key: const ValueKey('settings-button'),
-        focusNode: _settingsButtonFocusNode,
-        backgroundColor: const Color.fromARGB(98, 59, 128, 255),
-        focusColor: const Color.fromARGB(95, 122, 169, 255),
-        hoverColor: const Color.fromARGB(95, 122, 169, 255),
-        foregroundColor: Colors.white,
-        elevation: 0,
-        onPressed: () {
-          setState(() {
-            _showSettings = true;
-          });
-        },
-        icon: const Icon(Icons.play_arrow),
-        label: const Text('Settings'),
+          focusNode: _settingsButtonFocusNode,
+          backgroundColor: buttonColor,
+          focusColor: hoverColor,
+          hoverColor: hoverColor,
+          shape: RoundedRectangleBorder(
+            side: BorderSide(
+              width: 3,
+              color: _isSettingsButtonHovered ||
+                      _settingsButtonFocusNode.hasFocus
+                  ? Colors.white
+                  : Colors.transparent,
+            ),
+            borderRadius: BorderRadiusGeometry.circular(10),
+          ),
+          foregroundColor: Colors.white,
+          elevation: 0,
+          onPressed: () {
+            setState(() {
+              _showSettings = true;
+            });
+          },
+          icon: const Icon(Icons.play_arrow),
+          label: const Text('Settings'),
+        ),
       ),
     );
   }
@@ -1416,6 +1465,8 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
     _imageTimer?.cancel();
     _frameTimer?.cancel();
     _reloadTimer?.cancel();
+    _nextPlaylistButtonFocusNode.removeListener(_handleButtonFocusChange);
+    _settingsButtonFocusNode.removeListener(_handleButtonFocusChange);
     _nextPlaylistButtonFocusNode.dispose();
     _settingsButtonFocusNode.dispose();
     unawaited(_connectivitySubscription?.cancel());

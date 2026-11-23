@@ -66,6 +66,8 @@ class _FloatingSettingsBoxState extends State<FloatingSettingsBox> {
   final _textColor = Color.fromARGB(255, 255, 250, 250);
   final _disabledTextColor = Color.fromARGB(255, 152, 149, 149);
 
+  final _buttonBorderWidth = 2.0;
+
   @override
   void initState() {
     super.initState();
@@ -619,16 +621,16 @@ class _FloatingSettingsBoxState extends State<FloatingSettingsBox> {
                                 backgroundColor: WidgetStateProperty<Color>.fromMap(
                                   <WidgetStatesConstraint, Color>{
                                     WidgetState.disabled: _disabledButtonIdleColor,
-                                    WidgetState.focused: _buttonFocusColor,
-                                    WidgetState.pressed | WidgetState.hovered: _buttonFocusColor,
+                                    WidgetState.pressed: _buttonFocusColor,
+                                    WidgetState.focused | WidgetState.hovered: _buttonFocusColor,
                                     WidgetState.any: _buttonIdleColor,
                                   },
                                 ),
                                 side: WidgetStateProperty<BorderSide>.fromMap(
                                   <WidgetStatesConstraint, BorderSide>{
                                     WidgetState.disabled: BorderSide(color: _disabledButtonIdleColor),
-                                    WidgetState.focused: BorderSide(color: Colors.white),
-                                    WidgetState.pressed | WidgetState.hovered: BorderSide(color: Colors.white),
+                                    WidgetState.pressed: BorderSide(color: Colors.white, width: _buttonBorderWidth),
+                                    WidgetState.focused | WidgetState.hovered: BorderSide(color: Colors.white, width: _buttonBorderWidth),
                                     WidgetState.any: BorderSide(color: _buttonIdleColor),
                                   },
                                 ),
@@ -643,16 +645,16 @@ class _FloatingSettingsBoxState extends State<FloatingSettingsBox> {
                                 backgroundColor: WidgetStateProperty<Color>.fromMap(
                                   <WidgetStatesConstraint, Color>{
                                     WidgetState.disabled: _disabledButtonIdleColor,
-                                    WidgetState.focused: Colors.red,
-                                    WidgetState.pressed | WidgetState.hovered: Colors.red,
+                                    WidgetState.pressed: Colors.red,
+                                    WidgetState.focused | WidgetState.hovered: Colors.red,
                                     WidgetState.any: Color.fromARGB(255, 255, 0, 0),
                                   },
                                 ),
                                 side: WidgetStateProperty<BorderSide>.fromMap(
                                   <WidgetStatesConstraint, BorderSide>{
                                     WidgetState.disabled: BorderSide(color: _disabledButtonIdleColor),
-                                    WidgetState.focused: BorderSide(color: Colors.white),
-                                    WidgetState.pressed | WidgetState.hovered: BorderSide(color: Colors.white),
+                                    WidgetState.pressed: BorderSide(color: Colors.white, width: _buttonBorderWidth),
+                                    WidgetState.focused | WidgetState.hovered: BorderSide(color: Colors.white, width: _buttonBorderWidth),
                                     WidgetState.any: BorderSide(color: Color.fromARGB(255, 255, 0, 0)),
                                   },
                                 ),
@@ -687,16 +689,16 @@ class _FloatingSettingsBoxState extends State<FloatingSettingsBox> {
                                 backgroundColor: WidgetStateProperty<Color>.fromMap(
                                   <WidgetStatesConstraint, Color>{
                                     WidgetState.disabled: _disabledButtonIdleColor,
-                                    WidgetState.focused: _buttonFocusColor,
-                                    WidgetState.pressed | WidgetState.hovered: _buttonFocusColor,
+                                    WidgetState.pressed: _buttonFocusColor,
+                                    WidgetState.focused | WidgetState.hovered: _buttonFocusColor,
                                     WidgetState.any: _buttonIdleColor,
                                   },
                                 ),
                                 side: WidgetStateProperty<BorderSide>.fromMap(
                                   <WidgetStatesConstraint, BorderSide>{
                                     WidgetState.disabled: BorderSide(color: _disabledButtonIdleColor),
-                                    WidgetState.focused: BorderSide(color: Colors.white),
-                                    WidgetState.pressed | WidgetState.hovered: BorderSide(color: Colors.white),
+                                    WidgetState.pressed: BorderSide(color: Colors.white, width: _buttonBorderWidth),
+                                    WidgetState.focused | WidgetState.hovered: BorderSide(color: Colors.white, width: _buttonBorderWidth),
                                     WidgetState.any: BorderSide(color: _buttonIdleColor),
                                   },
                                 ),

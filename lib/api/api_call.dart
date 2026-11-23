@@ -58,6 +58,7 @@ class ApiCall {
   final _playlistsMapTickers = {};
 
   Future<bool> tryConnect(String systemId) async {
+    if(systemId.isEmpty) return false;
     String fullSystemId = '${systemId}_1';
     final secrets = await _getSecrets();
 
@@ -515,6 +516,8 @@ class ApiCall {
         //   mccId2 = mccIds[1];
         // }
       }
+
+      if(systemId.isEmpty) throw Exception('No SystemID found.');
 
       _dio.options.headers['X-BCM-API-KEY'] = secrets['api_key'];
       _dio.options.headers['X-BCM-UUID'] = '0000-0000';

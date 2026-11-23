@@ -108,7 +108,11 @@ class _ActivityMonitorState extends State<ActivityMonitor> {
             widget.settingsButtonFocusNode.requestFocus();
           } else if (!widget.settingsButtonFocusNode.hasFocus &&
               !widget.nextPlaylistButtonFocusNode.hasFocus) {
-            widget.settingsButtonFocusNode.requestFocus();
+            if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
+              widget.nextPlaylistButtonFocusNode.requestFocus();
+            } else {
+              widget.settingsButtonFocusNode.requestFocus();
+            }
           } else {
             return KeyEventResult.ignored;
           }
