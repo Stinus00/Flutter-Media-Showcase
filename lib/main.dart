@@ -7,7 +7,6 @@ import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_video_test/classes/frame_ticker_position.dart';
-import 'package:flutter_video_test/classes/system_data_login_file.dart';
 import 'package:flutter_video_test/widgets/activity_monitor.dart';
 import 'package:flutter_video_test/widgets/floating_settings_box.dart';
 import 'package:video_player/video_player.dart';

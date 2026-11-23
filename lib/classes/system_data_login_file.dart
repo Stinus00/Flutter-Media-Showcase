@@ -2,8 +2,8 @@ import 'dart:convert';
 
 import 'package:uuid/uuid.dart';
 
-import 'system_data_login_storage_io.dart'
-    if (dart.library.js_interop) 'system_data_login_storage_web.dart'
+import '../app_download/system_data_login_storage_io.dart'
+    if (dart.library.js_interop) '../cache_download/system_data_login_storage_web.dart'
     as storage;
 
 class SystemDataLoginFile {
