@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:web/web.dart';
 
 class ActivityMonitor extends StatefulWidget {
   const ActivityMonitor({
@@ -89,7 +88,8 @@ class _ActivityMonitorState extends State<ActivityMonitor> {
             event.logicalKey == LogicalKeyboardKey.arrowUp ||
             event.logicalKey == LogicalKeyboardKey.arrowDown ||
             event.logicalKey == LogicalKeyboardKey.arrowLeft ||
-            event.logicalKey == LogicalKeyboardKey.arrowRight;
+            event.logicalKey == LogicalKeyboardKey.arrowRight ||
+            event.logicalKey == LogicalKeyboardKey.select;
         if (isArrowKey &&
             (event is KeyDownEvent || event is KeyRepeatEvent)) {
           final wasHidden = !_buttonsVisible;
