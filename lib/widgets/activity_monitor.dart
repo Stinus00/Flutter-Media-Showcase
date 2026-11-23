@@ -54,6 +54,14 @@ class _ActivityMonitorState extends State<ActivityMonitor> {
     });
   }
 
+  void _startFastTimer() {
+    _showSettingsTimer?.cancel();
+    _showSettingsTimer = Timer(const Duration(seconds: 3), () {
+      if(!mounted) return;
+      _setButtonsVisible(false);
+    });
+  }
+
   void _stopIdleTimer() {
     _showSettingsTimer?.cancel();
   }
@@ -72,7 +80,7 @@ class _ActivityMonitorState extends State<ActivityMonitor> {
       if (widget.isSettingsOpen) {
         _stopIdleTimer();
       } else {
-        _startIdleTimer();
+        _startFastTimer();
       }
     }
   }
