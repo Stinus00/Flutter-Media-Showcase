@@ -48,7 +48,7 @@ class _ActivityMonitorState extends State<ActivityMonitor> {
 
   void _startIdleTimer() {
     _showSettingsTimer?.cancel();
-    _showSettingsTimer = Timer(const Duration(seconds: 10), () {
+    _showSettingsTimer = Timer(const Duration(seconds: 6), () { // 6 seconds
       if (!mounted) return;
       _setButtonsVisible(false);
     });
@@ -56,7 +56,7 @@ class _ActivityMonitorState extends State<ActivityMonitor> {
 
   void _startFastTimer() {
     _showSettingsTimer?.cancel();
-    _showSettingsTimer = Timer(const Duration(milliseconds: 3500), () {
+    _showSettingsTimer = Timer(const Duration(milliseconds: 3500), () { // 3.5 seconds
       if(!mounted) return;
       _setButtonsVisible(false);
     });
@@ -129,6 +129,7 @@ class _ActivityMonitorState extends State<ActivityMonitor> {
         return KeyEventResult.ignored;
       },
       child: MouseRegion(
+        cursor: _buttonsVisible ? SystemMouseCursors.basic : SystemMouseCursors.none,
         onHover: (event) => _updateActivity(),
         child: GestureDetector(
           behavior: HitTestBehavior.opaque,
