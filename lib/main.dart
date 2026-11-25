@@ -3,9 +3,15 @@ import 'dart:io';
 import 'dart:math' as math;
 
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_video_test/classes/errors.dart';
 import 'package:flutter_video_test/classes/frame_ticker_position.dart';
+import 'package:flutter_video_test/classes/system_data_login_file.dart';
+import 'package:flutter_video_test/sources/media_sources.dart';
+import 'package:flutter_video_test/widgets/activity_monitor.dart';
+import 'package:flutter_video_test/widgets/floating_settings_box.dart';
 import 'package:video_player/video_player.dart';
 import 'package:video_player_media_kit/video_player_media_kit.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
@@ -13,7 +19,7 @@ import 'package:wakelock_plus/wakelock_plus.dart';
 import 'classes/media_link.dart';
 import 'classes/frame_link.dart';
 import 'classes/ticker_link.dart';
-import 'classes/custom_ticker.dart';
+import 'widgets/custom_ticker.dart';
 
 import 'api/api_call.dart';
 import 'cache_download/page_reloader_stub.dart'
@@ -33,6 +39,12 @@ class VideoApp extends StatefulWidget {
 class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
   final MediaCacher _mediaCacher = MediaCacher();
   final ApiCall _apiCall = ApiCall();
+  final FocusNode _nextPlaylistButtonFocusNode = FocusNode(
+    debugLabel: 'Refresh playlist button',
+  );
+  final FocusNode _settingsButtonFocusNode = FocusNode(
+    debugLabel: 'Settings button',
+  );
 
   // Lists.
   List<MediaLink> _mediaLinks = [];
@@ -61,12 +73,19 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
   // Errors
   String? _imageError;
   String? _videoError;
-  String? _preloadError;
+  ApiException? _preloadError;
+  ApiException? _payloadError;
+  ApiException? _criticalErrorHandlingScheduledFor;
+  ApiException? _criticalErrorHandledFor;
 
   // Global booleans
   bool _isChangingVideo = false;
   bool _isSkippingMedia = false;
   bool _isPreparingMedia = true;
+  bool _showButtons = true;
+  bool _showSettings = false;
+  bool _isNextPlaylistButtonHovered = false;
+  bool _isSettingsButtonHovered = false;
   int _currentLinkIndex = 0;
   int _currentLinkIndexFrame = 0;
   int? _videoErrorIndex;
@@ -106,6 +125,8 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
+    _nextPlaylistButtonFocusNode.addListener(_handleButtonFocusChange);
+    _settingsButtonFocusNode.addListener(_handleButtonFocusChange);
     unawaited(WakelockPlus.enable());
     if (kIsWeb) {
       _reloadTimer = Timer(const Duration(hours: 12), reloadPage);
@@ -127,6 +148,10 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
     );
     unawaited(_checkConnectivity());
     unawaited(_prepareMedia(startChangeChecks: true));
+  }
+
+  void _handleButtonFocusChange() {
+    if (mounted) setState(() {});
   }
 
   Future<void> _checkConnectivity() async {
@@ -166,21 +191,42 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
   }
 
   // Download the media given and initialize the first media.
-  Future<void> _prepareMedia({bool startChangeChecks = false}) async {
+  Future<void> _prepareMedia({
+    bool startChangeChecks = false,
+    void Function(String phase, int completed, int total)? onDownloadProgress,
+  }) async {
+    if (mounted) {
+      setState(() {
+        _isPreparingMedia = true;
+        _preloadError = null;
+        _criticalErrorHandledFor = null;
+      });
+    }
 
     try {
+      await SystemDataLoginFile().storeUuid();
+
       if (_mediaLinks.isEmpty) {
-        _mediaLinks = await _apiCall.getMediaFromApi();
+        _mediaLinks = await _apiCall.getMediaFromApi(
+          onProgress: (completed, total) =>
+              onDownloadProgress?.call('media', completed, total),
+        );
       }
       if (_frameLinks.isEmpty) {
-        _frameLinks = await _apiCall.getFrameLinksFromApi();
+        _frameLinks = await _apiCall.getFrameLinksFromApi(
+          onProgress: (completed, total) =>
+              onDownloadProgress?.call('frames', completed, total),
+        );
       }
 
       List<TickerLink> tickerLinksOne = [];
       List<TickerLink> tickerLinksTwo = [];
 
-      if(_tickerLinksMain.isEmpty) {
-        (tickerLinksOne, tickerLinksTwo) = await _apiCall.getTickerLinksFromApi();
+      if (_tickerLinksMain.isEmpty) {
+        (tickerLinksOne, tickerLinksTwo) = await _apiCall.getTickerLinksFromApi(
+          onProgress: (completed, total) =>
+              onDownloadProgress?.call('tickers', completed, total),
+        );
       }
       _tickerLinksMain = tickerLinksOne;
       _tickerLinksSecondary = tickerLinksTwo;
@@ -194,12 +240,12 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
       if (startChangeChecks) {
         _startChangeChecks();
       }
-    } catch (error) {
+    } on DioException catch (error) {
       if (!mounted) return;
       if (startChangeChecks) {
         _startChangeChecks();
       }
-      if (!kIsWeb) {
+      if (!kIsWeb && error.type == DioExceptionType.connectionError) {
         final cached = await _apiCall.loadSavedApiMedia();
         if (cached.media.isNotEmpty) {
           _mediaLinks = cached.media;
@@ -221,12 +267,33 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
           await _initializeFrame();
           return;
         }
+      } else if (error.type == DioExceptionType.connectionError) {
+        _preloadError = ApiException(480, 'No internet connection');
       }
 
       setState(() {
         _isPreparingMedia = false;
-        _preloadError = error.toString();
+        _preloadError = ApiException(
+          error.response?.statusCode,
+          error.response?.statusMessage,
+        );
       });
+    } on ApiException catch (error) {
+      print('Error found: $error');
+      if (mounted) {
+        setState(() {
+          _isPreparingMedia = false;
+          _preloadError = error;
+        });
+      }
+    } catch (error) {
+      print('Error found: $error');
+      if (mounted) {
+        setState(() {
+          _isPreparingMedia = false;
+          _preloadError = ApiException(0, error.toString());
+        });
+      }
     }
   }
 
@@ -239,7 +306,9 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
     _payloadCheckTimer?.cancel();
     _tickerCheckTimer?.cancel();
 
-    _scheduleCheckTimer ??= Timer.periodic(const Duration(minutes: 1), (_) { // Check if schedules have changed
+    _scheduleCheckTimer = Timer.periodic(const Duration(minutes: 1), (_) {
+      // 1 minute
+      // Check if schedules have changed
       if (_mediaLinks.isEmpty) {
         setState(() {
           _preloadError = null;
@@ -251,8 +320,10 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
         });
       }
     });
-    _payloadCheckTimer ??= Timer.periodic(const Duration(minutes: 15), (_) { // Check if API callback has changed
-      if(_hasNetworkConnection == true) {
+    _payloadCheckTimer = Timer.periodic(const Duration(minutes: 15), (_) {
+      // 15 minutes
+      // Check if API callback has changed
+      if (_hasNetworkConnection == true) {
         if (_mediaLinks.isEmpty) {
           setState(() {
             _preloadError = null;
@@ -265,11 +336,13 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
         }
       }
     });
-    _tickerCheckTimer ??= Timer.periodic(const Duration(minutes: 10), (_) async { // Check if tickersources have changed
-      if(_hasNetworkConnection == true) {
+    _tickerCheckTimer = Timer.periodic(const Duration(minutes: 10), (_) async {
+      // 10 minutes
+      // Check if tickersources have changed
+      if (_hasNetworkConnection == true) {
         final updatedTickerLinks = await _apiCall
             .rebuildTickersForCurrentSchedules(now: DateTime.now());
-        
+
         List<TickerLink> tickerLinksOne = [];
         List<TickerLink> tickerLinksTwo = [];
 
@@ -285,6 +358,98 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
     });
   }
 
+  Future<void> _onDisconnect() async {
+    await _apiCall.fullyDeleteStoredMedia();
+
+    _scheduleCheckTimer?.cancel();
+    _payloadCheckTimer?.cancel();
+    _tickerCheckTimer?.cancel();
+
+    _scheduleCheckTimer = null;
+    _payloadCheckTimer = null;
+    _tickerCheckTimer = null;
+
+    _imageTimer?.cancel();
+    _frameTimer?.cancel();
+    _controller?.dispose();
+
+    setState(() {
+      _mediaLinks = [];
+      _frameLinks = [];
+      _tickerLinksMain = [];
+      _tickerLinksSecondary = [];
+      tickerMain = [];
+      tickerSecondary = [];
+
+      frameTickerPositions = [];
+
+      _currentLinkIndex = 0;
+      _currentLinkIndexFrame = 0;
+
+      x1 = null;
+      x2 = null;
+      y1 = null;
+      y2 = null;
+      creationType = null;
+    });
+
+    _preloadError = ApiException(600, 'No System ID found');
+  }
+
+  Future<void> _onCriticalError() async {
+    if (!mounted) return;
+
+    _scheduleCheckTimer?.cancel();
+    _payloadCheckTimer?.cancel();
+    _tickerCheckTimer?.cancel();
+
+    _scheduleCheckTimer = null;
+    _payloadCheckTimer = null;
+    _tickerCheckTimer = null;
+
+    _imageTimer?.cancel();
+    _frameTimer?.cancel();
+    _controller?.dispose();
+
+    setState(() {
+      _mediaLinks = [];
+      _frameLinks = [];
+      _tickerLinksMain = [];
+      _tickerLinksSecondary = [];
+      tickerMain = [];
+      tickerSecondary = [];
+
+      frameTickerPositions = [];
+
+      _currentLinkIndex = 0;
+      _currentLinkIndexFrame = 0;
+
+      x1 = null;
+      x2 = null;
+      y1 = null;
+      y2 = null;
+      creationType = null;
+    });
+  }
+
+  void _scheduleCriticalErrorHandling(ApiException error) {
+    if (identical(error, _criticalErrorHandlingScheduledFor) ||
+        identical(error, _criticalErrorHandledFor)) {
+      return;
+    }
+
+    _criticalErrorHandlingScheduledFor = error;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (identical(_criticalErrorHandlingScheduledFor, error)) {
+        _criticalErrorHandlingScheduledFor = null;
+      }
+      if (!mounted || !identical(_preloadError, error)) return;
+
+      _criticalErrorHandledFor = error;
+      unawaited(_onCriticalError());
+    });
+  }
+
   // Check if there's any changes in api or schedules
   // Clear everything if there are changes.
   Future<void> _checkForMediaChanges({bool checkPayload = false}) async {
@@ -295,10 +460,13 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
     }
     _isCheckingForChanges = true;
     try {
-      final payloadChanged = checkPayload == true // Check if callback has changed
+      final payloadChanged =
+          checkPayload ==
+              true // Check if callback has changed
           ? await _apiCall.hasPayloadChanged()
           : false;
-      final schedulesChanged = _apiCall.haveSchedulesChanged(); // Check if changes in schedule
+      final schedulesChanged = _apiCall
+          .haveSchedulesChanged(); // Check if changes in schedule
       if (!payloadChanged && !schedulesChanged) {
         await _apiCall.cleanupStoredMedia();
         return;
@@ -311,7 +479,7 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
           .rebuildFramesForCurrentSchedules();
       final updatedTickerLinks = await _apiCall
           .rebuildTickersForCurrentSchedules();
-    
+
       // Clear everything for future use
       _isChangingVideo = true;
       _imageTimer?.cancel();
@@ -354,6 +522,12 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
       }
     } catch (error) {
       debugPrint('Error checking for media changes: $error');
+      if (error is DioException) {
+        _preloadError = ApiException(
+          error.response?.statusCode,
+          error.response?.statusMessage,
+        );
+      }
     } finally {
       _isChangingVideo = false;
       _isCheckingForChanges = false;
@@ -474,11 +648,11 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
 
   void _updateTickers() {
     tickerMain = [];
-    for(final ticker in _tickerLinksMain) {
+    for (final ticker in _tickerLinksMain) {
       tickerMain += ticker.tickerStrings;
     }
     tickerSecondary = [];
-    for(final ticker in _tickerLinksSecondary) {
+    for (final ticker in _tickerLinksSecondary) {
       tickerSecondary += ticker.tickerStrings;
     }
   }
@@ -806,7 +980,7 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
     }
   }
 
-  // Widget to display the app
+  // Widget to display the appf
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -822,96 +996,144 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
               constraints.maxHeight / canvasHeight,
             );
 
-            return Stack(
-              alignment: Alignment.center,
-              children: [
-                // Check if there's frame coordinates.
-                // // If there is build frame and put media inside frame.
-                // // If there isn't just build media.
-                if (x1 != null)
-                  Center(
-                    child: SizedBox(
-                      width: canvasWidth * scale,
-                      height: canvasHeight * scale,
+            return ActivityMonitor(
+              nextPlaylistButtonFocusNode: _nextPlaylistButtonFocusNode,
+              settingsButtonFocusNode: _settingsButtonFocusNode,
+              isSettingsOpen: _showSettings,
+              onVisibilityChanged: (visible) {
+                if (_showButtons == visible) return;
+                setState(() {
+                  _showButtons = visible;
+                });
+              },
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  // Check if there's frame coordinates.
+                  // // If there is build frame and put media inside frame.
+                  // // If there isn't just build media.
+                  if (x1 != null)
+                    Center(
+                      child: SizedBox(
+                        width: canvasWidth * scale,
+                        height: canvasHeight * scale,
+                        child: Stack(
+                          children: [
+                            _buildMediaFrame(),
+                            Positioned(
+                              left: x1! * scale,
+                              top: y1! * scale,
+                              width: (x2! - x1!) * scale,
+                              height: (y2! - y1!) * scale,
+                              child: ClipRect(
+                                child: _buildMedia((y2! - y1!) * scale),
+                              ),
+                            ),
+                            if (creationType == 'bcm') _buildMediaFrame(),
+                            if (frameTickerPositions.isNotEmpty)
+                              for (var fPos in frameTickerPositions)
+                                if (fPos.index == 1)
+                                  Positioned(
+                                    key: ValueKey(fPos.index),
+                                    left: fPos.x1 * scale,
+                                    top: fPos.y1 * scale,
+                                    width: (fPos.x2 - fPos.x1) * scale,
+                                    height: (fPos.y2 - fPos.y1) * scale,
+                                    child: ClipRect(
+                                      child: _buildTickers(
+                                        (fPos.y2 - fPos.y1) * scale,
+                                        tickerMain,
+                                        key: _tickerKeyFor(fPos.index),
+                                        inFrame: true,
+                                        fontSize: fPos.fontSize!,
+                                        fontColor: fPos.fontColor,
+                                      ),
+                                    ),
+                                  )
+                                else
+                                  Positioned(
+                                    key: ValueKey(fPos.index),
+                                    left: fPos.x1 * scale,
+                                    top: fPos.y1 * scale,
+                                    width: (fPos.x2 - fPos.x1) * scale,
+                                    height: (fPos.y2 - fPos.y1) * scale,
+                                    child: ClipRect(
+                                      child: _buildTickers(
+                                        (fPos.y2 - fPos.y1) * scale,
+                                        tickerSecondary,
+                                        key: _tickerKeyFor(fPos.index),
+                                        inFrame: true,
+                                        fontSize: fPos.fontSize!,
+                                        fontColor: fPos.fontColor,
+                                      ),
+                                    ),
+                                  ),
+                          ],
+                        ),
+                      ),
+                    )
+                  else
+                    Center(child: _buildMedia(canvasHeight * scale)),
+                  AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 200),
+                    transitionBuilder: (child, animation) {
+                      return FadeTransition(opacity: animation, child: child);
+                    },
+                    child: _showButtons ? _buildButtonShowcase() : null,
+                  ),
+                  if (_showSettings)
+                    FloatingSettingsBox(
+                      onConnected: (onProgress) async {
+                        await _prepareMedia(
+                          startChangeChecks: true,
+                          onDownloadProgress: onProgress,
+                        );
+                        final error = _preloadError;
+                        if (error != null) {
+                          throw error;
+                        }
+                      },
+                      onDisconnected: () => _onDisconnect(),
+                      onCloseSettings: () {
+                        setState(() {
+                          _showSettings = false;
+                        });
+                      },
+                      tryConnect: (String systemId) async {
+                        return await _apiCall.tryConnect(systemId);
+                      },
+                    ),
+                  if (_hasNetworkConnection == false)
+                    Align(
+                      alignment: Alignment.topLeft,
                       child: Stack(
+                        alignment: Alignment.topLeft,
                         children: [
-                          _buildMediaFrame(),
-                          Positioned(
-                            left: x1! * scale,
-                            top: y1! * scale,
-                            width: (x2! - x1!) * scale,
-                            height: (y2! - y1!) * scale,
-                            child: ClipRect(
-                              child: _buildMedia((y2! - y1!) * scale),
+                          // White silhouette behind the original transparent image
+                          Transform.translate(
+                            offset: const Offset(-2.5, -2.5),
+                            child: ColorFiltered(
+                              colorFilter: const ColorFilter.mode(
+                                Colors.black,
+                                BlendMode.srcIn,
+                              ),
+                              child: Image.asset(
+                                'assets/no-internet.png',
+                                width: 85,
+                              ),
                             ),
                           ),
-                          if (creationType == 'bcm') _buildMediaFrame(),
-                          if (frameTickerPositions.isNotEmpty)
-                            for (var fPos in frameTickerPositions)
-                              if (fPos.index == 1) 
-                                Positioned(
-                                  key: ValueKey(fPos.index),
-                                  left: fPos.x1 * scale,
-                                  top: fPos.y1 * scale,
-                                  width: (fPos.x2 - fPos.x1) * scale,
-                                  height: (fPos.y2 - fPos.y1) * scale,
-                                  child: ClipRect(
-                                    child: _buildTickers((fPos.y2 - fPos.y1) * scale, tickerMain, key: _tickerKeyFor(fPos.index), inFrame: true, fontSize: fPos.fontSize!, fontColor: fPos.fontColor)
-                                  ),
-                                )
-                              else
-                                Positioned(
-                                  key: ValueKey(fPos.index),
-                                  left: fPos.x1 * scale,
-                                  top: fPos.y1 * scale,
-                                  width: (fPos.x2 - fPos.x1) * scale,
-                                  height: (fPos.y2 - fPos.y1) * scale,
-                                  child: ClipRect(
-                                    child: _buildTickers((fPos.y2 - fPos.y1) * scale, tickerSecondary, key: _tickerKeyFor(fPos.index), inFrame: true, fontSize: fPos.fontSize!, fontColor: fPos.fontColor)
-                                  ),
-                                )
-                            
+
+                          Image.asset(
+                            'assets/no-internet.png',
+                            width: 80,
+                            color: Colors.red,
+                          ),
                         ],
                       ),
                     ),
-                  )
-                else
-                  Center(child: _buildMedia(canvasHeight * scale)),
-                Positioned(
-                  right: 16,
-                  bottom: 16,
-                  child: _buildNextPlaylistButton(),
-                ),
-                if (_hasNetworkConnection == false)
-                  Align(
-                    alignment: Alignment.topLeft,
-                    child: Stack(
-                      alignment: Alignment.topLeft,
-                      children: [
-                        // White silhouette behind the original transparent image
-                        Transform.translate(
-                          offset: const Offset(-2.5, -2.5),
-                          child: ColorFiltered(
-                            colorFilter: const ColorFilter.mode(
-                              Colors.black,
-                              BlendMode.srcIn,
-                            ),
-                            child: Image.asset(
-                              'assets/no-internet.png',
-                              width: 85,
-                            ),
-                          ),
-                        ),
-
-                        Image.asset(
-                          'assets/no-internet.png',
-                          width: 80,
-                          color: Colors.red,
-                        ),
-                      ],
-                    ),
-                  ),
-              ],
+                ],
+              ),
             );
           },
         ),
@@ -928,24 +1150,31 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
     return Stack(
       alignment: Alignment.bottomCenter,
       children: [
-        _buildMediaContent(),
+        _buildMediaContent(mediaHeight),
         if (frameTickerPositions.isEmpty) ...[
           Positioned(
             key: ValueKey(1),
             left: 0,
             right: 0,
             bottom: -5,
-            child: _buildTickers(mediaHeight, tickerMain, key: _tickerKeyFor(1)),
+            child: _buildTickers(
+              mediaHeight,
+              tickerMain,
+              key: _tickerKeyFor(1),
+            ),
           ),
           Positioned(
             key: ValueKey(0),
             left: 0,
             right: 0,
             top: 0,
-            child: _buildTickers(mediaHeight, tickerSecondary, key: _tickerKeyFor(2)),
+            child: _buildTickers(
+              mediaHeight,
+              tickerSecondary,
+              key: _tickerKeyFor(2),
+            ),
           ),
-        ]
-        else if (frameTickerPositions.length == 1 &&
+        ] else if (frameTickerPositions.length == 1 &&
             tickerSecondary.isNotEmpty)
           Positioned(
             key: ValueKey(0),
@@ -964,7 +1193,7 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
     );
   }
 
-  Widget _buildMediaContent() {
+  Widget _buildMediaContent(double mediaHeight) {
     if (_isPreparingMedia) {
       return const CircularProgressIndicator();
     }
@@ -983,12 +1212,128 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
           width: double.infinity,
         );
       }
-      return Image.asset(
-        'assets/placeholder-green.png',
-        fit: BoxFit.contain,
-        height: double.infinity,
-        width: double.infinity,
-      );
+
+      ScreenError? screenError;
+
+      switch (_preloadError!.statusCode) {
+        case 403:
+          _scheduleCriticalErrorHandling(_preloadError!);
+          screenError = ScreenError(
+            403, 
+            'Another screen is already connected to the BCM Media Control Center (MCC) with the current code.', 
+            'Open settings to setup a new connection'
+          );
+          break;
+        case 404:
+          _scheduleCriticalErrorHandling(_preloadError!);
+          screenError = ScreenError(
+            404, 
+            'Unable to connect with the BCM Media Control Center (MCC)', 
+            'Open settings to setup a new connection'
+          );
+          break;
+        case 408:
+          if (mediaLinks.isEmpty) {
+            screenError = ScreenError(
+              408, 
+              'Unable to retrieve content from the BCM Media Control Center (MCC)', 
+              'No content to show'
+            );
+          }
+          break;
+        case 480:
+          if (mediaLinks.isEmpty) {
+            screenError = ScreenError(
+              480, 
+              'Unable to refresh.\nPlease check internet connection', 
+              'No content to show'
+            );
+          }
+          break;
+        case 500:
+          if (mediaLinks.isEmpty) {
+            screenError = ScreenError(
+              500, 
+              'Unable to retrieve content from the BCM Media Control Center (MCC)', 
+              'No content to show'
+            );
+          }
+          break;
+        case 600:
+          screenError = ScreenError(
+            600, 
+            'Not connected with BCM Media Control Center (MCC)', 
+            'Please connect this screen with your environment of the MCC'
+          );
+          break;
+        default:
+          screenError = ScreenError(
+            0, 
+            'No content available', 
+            ''
+          );
+      }
+    
+      if (screenError != null) {
+        return Container(
+          width: 500,
+          height: mediaHeight,
+          decoration: BoxDecoration(border: Border.all()),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Text(// Logo (REPLACE)
+                      'BCM Logo',
+                      style: TextStyle(
+                        color: Color.fromARGB(255, 255, 98, 0),
+                        fontWeight: FontWeight(1000),
+                        fontSize: 50,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    Text( // Error message
+                      // Message
+                      '${screenError.message}',
+                      style: TextStyle(
+                        color: Color.fromARGB(255, 255, 98, 0),
+                        fontWeight: FontWeight(1000),
+                        fontSize: 30,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    Text(''),
+                    Text( // Instructions message
+                      // Message
+                      '${screenError.instructions}',
+                      style: TextStyle(
+                        color: Color.fromARGB(255, 255, 133, 57),
+                        fontWeight: FontWeight(1000),
+                        fontSize: 20,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              ),
+              if(screenError.statusCode != 0)
+                Align( // Status code
+                  alignment: Alignment.bottomLeft,
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Text(
+                      'Error ${screenError.statusCode}',
+                      style: const TextStyle(color: Colors.grey, fontSize: 20),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        );
+      }
     }
 
     // If there's a video error, skip media and display the error temporarily.
@@ -1079,11 +1424,29 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
     });
   }
 
+  bool _checkForPreloadError() {
+    switch (_preloadError?.statusCode) {
+      case 403 || 404:
+        _scheduleCriticalErrorHandling(_preloadError!);
+        return true;
+      case 408 || 480 || 500:
+        if (mediaLinks.isEmpty) {
+          return true;
+        }
+        return false;
+      case 600:
+        return true;
+      default:
+        return true;
+    }
+  }
+
+  // Build frames
   Widget _buildMediaFrame() {
     if (_isPreparingMedia) {
       return const CircularProgressIndicator();
     }
-    if (_preloadError != null) {
+    if (_preloadError != null && _checkForPreloadError()) {
       return Padding(
         padding: const EdgeInsets.all(24),
         child: Text(
@@ -1094,12 +1457,7 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
     }
 
     if (_frameLinks.isEmpty) {
-      return Image.asset(
-        'assets/placeholder.png',
-        fit: BoxFit.contain,
-        height: double.infinity,
-        width: double.infinity,
-      );
+      return Padding(padding: const EdgeInsets.all(24));
     }
 
     final media = _currentMediaFrame!;
@@ -1130,17 +1488,26 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
           );
   }
 
-  Widget _buildTickers(double mediaHeight, List<String> tickerString, {Key? key, bool LtoR = false, bool inFrame = false, int fontSize = 0, Color? fontColor = Colors.white}) {
+  // Build tickers
+  Widget _buildTickers(
+    double mediaHeight,
+    List<String> tickerString, {
+    Key? key,
+    bool LtoR = false,
+    bool inFrame = false,
+    int fontSize = 0,
+    Color? fontColor = Colors.white,
+  }) {
     final percent = 0.10;
     double fontSizeInternal = mediaHeight * percent;
-    if(fontSize != 0) {
+    if (fontSize != 0) {
       fontSizeInternal = fontSize.toDouble() * (mediaHeight * 0.01);
     }
 
     bool border = true;
     Color textColor = Colors.white;
     Color borderColor = Colors.black;
-    if(fontColor != null && fontColor != Colors.white) {
+    if (fontColor != null && fontColor != Colors.white) {
       border = false;
       textColor = fontColor;
     }
@@ -1162,36 +1529,145 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
     );
   }
 
+  // Build the screen to show all buttons
+  Widget _buildButtonShowcase() {
+    Color gradientColor = Colors.black;
+    Color buttonColor = Colors.deepOrange;
+    Color buttonHoverColor = Colors.deepOrangeAccent;
+
+    return Stack(
+      children: [
+        Container(
+          // Gradient Top
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment(0, 1),
+              colors: <Color>[
+                gradientColor,
+                Color.fromARGB(0, 0, 0, 0),
+                Color.fromARGB(0, 0, 0, 0),
+              ], // Gradient from https://learnui.design/tools/gradient-generator.html
+            ),
+          ),
+        ),
+        Container(
+          // Gradient Bottom
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.bottomCenter,
+              end: const Alignment(0, -0.1),
+              colors: <Color>[
+                gradientColor,
+                const Color.fromARGB(0, 0, 0, 0),
+                const Color.fromARGB(0, 0, 0, 0),
+              ], // Gradient from https://learnui.design/tools/gradient-generator.html
+            ),
+          ),
+        ),
+
+        Positioned(
+          right: 16,
+          bottom: 16,
+          child: _buildNextPlaylistButton(buttonColor, buttonHoverColor),
+        ),
+        Positioned(
+          right: 16,
+          top: 16,
+          child: _buildSettingsButton(buttonColor, buttonHoverColor),
+        ),
+      ],
+    );
+  }
+
   // Button to re-ask API data for testing
-  Widget _buildNextPlaylistButton() {
+  Widget _buildNextPlaylistButton(Color buttonColor, Color hoverColor) {
     return AnimatedSwitcher(
       duration: const Duration(milliseconds: 250),
       transitionBuilder: (child, animation) => ScaleTransition(
         scale: animation,
         child: FadeTransition(opacity: animation, child: child),
       ),
-      child: FloatingActionButton.extended(
-        key: const ValueKey('sample-button'),
-        backgroundColor: const Color.fromARGB(98, 59, 128, 255),
-        hoverColor: const Color.fromARGB(97, 45, 119, 255),
-        foregroundColor: Colors.white,
-        elevation: 0,
-        onPressed: () {
-          if (_isPreparingMedia) return;
+      child: MouseRegion(
+        onEnter: (_) => setState(() => _isNextPlaylistButtonHovered = true),
+        onExit: (_) => setState(() => _isNextPlaylistButtonHovered = false),
+        child: FloatingActionButton.extended(
+          key: const ValueKey('next-playlist-button'),
+          focusNode: _nextPlaylistButtonFocusNode,
+          backgroundColor: buttonColor,
+          focusColor: hoverColor,
+          hoverColor: hoverColor,
+          shape: RoundedRectangleBorder(
+            side: BorderSide(
+              width: 3,
+              color:
+                  _isNextPlaylistButtonHovered ||
+                      _nextPlaylistButtonFocusNode.hasFocus
+                  ? Colors.white
+                  : Colors.transparent,
+            ),
+            borderRadius: BorderRadiusGeometry.circular(10),
+          ),
+          foregroundColor: Colors.white,
+          elevation: 0,
+          onPressed: () {
+            if (_isPreparingMedia) return;
 
-          if (_mediaLinks.isEmpty) {
+            if (_mediaLinks.isEmpty) {
+              setState(() {
+                _preloadError = null;
+              });
+              unawaited(_checkForMediaChanges(checkPayload: true));
+            } else {
+              setState(() {
+                _checkPayload = true;
+              });
+            }
+          },
+          icon: const Icon(Icons.play_arrow),
+          label: const Text('Refresh A'),
+        ),
+      ),
+    );
+  }
+
+  // Button to open settings
+  Widget _buildSettingsButton(Color buttonColor, Color hoverColor) {
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 250),
+      transitionBuilder: (child, animation) => ScaleTransition(
+        scale: animation,
+        child: FadeTransition(opacity: animation, child: child),
+      ),
+      child: MouseRegion(
+        onEnter: (_) => setState(() => _isSettingsButtonHovered = true),
+        onExit: (_) => setState(() => _isSettingsButtonHovered = false),
+        child: FloatingActionButton.extended(
+          key: const ValueKey('settings-button'),
+          focusNode: _settingsButtonFocusNode,
+          backgroundColor: buttonColor,
+          focusColor: hoverColor,
+          hoverColor: hoverColor,
+          shape: RoundedRectangleBorder(
+            side: BorderSide(
+              width: 3,
+              color:
+                  _isSettingsButtonHovered || _settingsButtonFocusNode.hasFocus
+                  ? Colors.white
+                  : Colors.transparent,
+            ),
+            borderRadius: BorderRadiusGeometry.circular(10),
+          ),
+          foregroundColor: Colors.white,
+          elevation: 0,
+          onPressed: () {
             setState(() {
-              _preloadError = null;
+              _showSettings = true;
             });
-            unawaited(_checkForMediaChanges(checkPayload: true));
-          } else {
-            setState(() {
-              _checkPayload = true;
-            });
-          }
-        },
-        icon: const Icon(Icons.play_arrow),
-        label: const Text('Refresh A'),
+          },
+          icon: const Icon(Icons.play_arrow),
+          label: const Text('Settings'),
+        ),
       ),
     );
   }
@@ -1211,6 +1687,10 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
     _imageTimer?.cancel();
     _frameTimer?.cancel();
     _reloadTimer?.cancel();
+    _nextPlaylistButtonFocusNode.removeListener(_handleButtonFocusChange);
+    _settingsButtonFocusNode.removeListener(_handleButtonFocusChange);
+    _nextPlaylistButtonFocusNode.dispose();
+    _settingsButtonFocusNode.dispose();
     unawaited(_connectivitySubscription?.cancel());
     _scheduleCheckTimer?.cancel();
     _payloadCheckTimer?.cancel();

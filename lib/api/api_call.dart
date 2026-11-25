@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_video_test/classes/api_mcc_data.dart';
 import 'package:flutter_video_test/cache_download/media_cache_deletion.dart';
 import 'package:flutter_video_test/api/api_xml_handler.dart';
+import 'package:flutter_video_test/classes/errors.dart';
 import 'package:flutter_video_test/classes/frame_link.dart';
 import 'package:flutter_video_test/cache_download/media_cacher_stub.dart'
     if (dart.library.js_interop) 'package:flutter_video_test/cache_download/media_cacher.dart';
@@ -14,6 +15,7 @@ import 'package:flutter_video_test/app_download/media_deletion.dart';
 import 'package:flutter_video_test/app_download/media_downloader.dart';
 import 'package:flutter_video_test/classes/frame_ticker_position.dart';
 import 'package:flutter_video_test/classes/media_link.dart';
+import 'package:flutter_video_test/classes/system_data_login_file.dart';
 import 'package:flutter_video_test/classes/ticker_link.dart';
 import 'package:intl/intl.dart';
 import 'package:teno_rrule/teno_rrule.dart';
@@ -56,8 +58,31 @@ class ApiCall {
   final _playlistsMapFrames = {};
   final _playlistsMapTickers = {};
 
+  Future<bool> tryConnect(String systemId) async {
+    if(systemId.isEmpty) return false;
+    String fullSystemId = '${systemId}_1';
+    final secrets = await _getSecrets();
+
+    // try {
+      _dio.options.headers[secrets['api_header']] = secrets['api_key'];
+
+      final url = 'https://api.mediacontrolcenter.com/api/v1/system/$fullSystemId/export-full';
+      final response = await _dio.get(url);
+      // await _saveApiResponse(response);
+      if (response.statusCode == 200) {
+        return true;
+      } else {
+        throw Exception('Failed to load JSON from $url');
+      }
+    // } catch (e) {
+    //   return false;
+    // }
+  }
+  
   // Get data from URL
-  Future<List<MediaLink>> getMediaFromApi() async {
+  Future<List<MediaLink>> getMediaFromApi({
+    void Function(int completed, int total)? onProgress,
+  }) async {
     // await _downloader.cleanupAppDirectory();
 
     try {
@@ -70,6 +95,7 @@ class ApiCall {
       final media = await _buildMediaFromResponse(
         jsonString,
         now: DateTime.now(),
+        onProgress: onProgress,
       );
       await cleanupStoredMedia();
       return media;
@@ -79,7 +105,9 @@ class ApiCall {
     }
   }
 
-  Future<List<FrameLink>> getFrameLinksFromApi() async {
+  Future<List<FrameLink>> getFrameLinksFromApi({
+    void Function(int completed, int total)? onProgress,
+  }) async {
     try {
       final responseJson = _currentResponseJson;
       final data = responseJson == null
@@ -87,14 +115,20 @@ class ApiCall {
           : jsonDecode(responseJson) as Map<String, dynamic>;
       final jsonString = await _shortenJsonData(data);
 
-      return await _buildFramesFromResponse(jsonString, now: DateTime.now());
+      return await _buildFramesFromResponse(
+        jsonString,
+        now: DateTime.now(),
+        onProgress: onProgress,
+      );
     } catch (e) {
       debugPrint('Error fetching frames from API: $e');
       rethrow;
     }
   }
 
-  Future<(List<TickerLink>, List<TickerLink>)> getTickerLinksFromApi() async {
+  Future<(List<TickerLink>, List<TickerLink>)> getTickerLinksFromApi({
+    void Function(int completed, int total)? onProgress,
+  }) async {
     try {
       final responseJson = _currentResponseJson;
       final data = responseJson == null
@@ -102,7 +136,11 @@ class ApiCall {
           : jsonDecode(responseJson) as Map<String, dynamic>;
       final jsonString = await _shortenJsonData(data);
 
-      return await _buildTickersFromResponse(jsonString, now: DateTime.now());
+      return await _buildTickersFromResponse(
+        jsonString,
+        now: DateTime.now(),
+        onProgress: onProgress,
+      );
     } catch (e) {
       debugPrint('Error fetching tickers from API: $e');
       rethrow;
@@ -319,6 +357,7 @@ class ApiCall {
   Future<List<MediaLink>> _buildMediaFromResponse(
     String jsonString, {
     required DateTime now,
+    void Function(int completed, int total)? onProgress,
   }) async {
     final media = <dynamic>[];
     final shuffleList = <dynamic>[];
@@ -350,7 +389,10 @@ class ApiCall {
       ..addAll(shuffleList);
 
     final mediaLinks = await _convertMediaToMediaLink(combinedList);
-    final downloadedMediaLinks = await _downloadMedia(mediaLinks);
+    final downloadedMediaLinks = await _downloadMedia(
+      mediaLinks,
+      onProgress: onProgress,
+    );
     await _saveApiResponse(jsonString);
     _currentResponseJson = jsonString;
     _pendingResponseJson = null;
@@ -362,6 +404,7 @@ class ApiCall {
   Future<List<FrameLink>> _buildFramesFromResponse(
     String jsonString, {
     required DateTime now,
+    void Function(int completed, int total)? onProgress,
   }) async {
     final frames = <dynamic>[];
     final mainList = <dynamic>[];
@@ -386,7 +429,10 @@ class ApiCall {
     _getPlaylistData(frames, List.empty(), mainList, 'frames');
 
     final frameLinks = await _convertFramesToFrameLinks(mainList);
-    final downloadedFramesLinks = await _downloadFrames(frameLinks);
+    final downloadedFramesLinks = await _downloadFrames(
+      frameLinks,
+      onProgress: onProgress,
+    );
     _currentResponseJson = jsonString;
     _pendingResponseJson = null;
     _lastActiveScheduleFrameIds = _scheduleIds(groupSchedules, systemSchedules);
@@ -399,6 +445,7 @@ class ApiCall {
     String jsonString, {
     required DateTime now,
     bool useSavedTickerStrings = false,
+    void Function(int completed, int total)? onProgress,
   }) async {
     final tickers = <dynamic>[];
     final mainList = <dynamic>[];
@@ -431,8 +478,17 @@ class ApiCall {
       secondaryList,
       useSavedTickerStrings: useSavedTickerStrings,
     );
-    final downloadedTickerLinksMain = await _downloadTickers(tickerLinksMain);
-    final downloadedTickerLinksSecondary = await _downloadTickers(tickerLinksSecondary);
+    final tickerTotal = tickerLinksMain.length + tickerLinksSecondary.length;
+    onProgress?.call(0, tickerTotal);
+    final downloadedTickerLinksMain = await _downloadTickers(
+      tickerLinksMain,
+      onProgress: (completed, _) => onProgress?.call(completed, tickerTotal),
+    );
+    final downloadedTickerLinksSecondary = await _downloadTickers(
+      tickerLinksSecondary,
+      onProgress: (completed, _) =>
+          onProgress?.call(tickerLinksMain.length + completed, tickerTotal),
+    );
     _currentResponseJson = jsonString;
     _pendingResponseJson = null;
     _lastActiveScheduleTickerIds = _scheduleIds(groupSchedules, systemSchedules);
@@ -443,8 +499,32 @@ class ApiCall {
   Future<Map<String, dynamic>> _getJsonFromUrl() async {
     try {
       final secrets = await _getSecrets();
-      _dio.options.headers[secrets['api_header']] = secrets['api_key'];
-      final url = secrets['api_url'];
+      final systemData = await SystemDataLoginFile().readIds();
+      String systemId = '';
+      if (systemData != null) {
+        systemId = systemData.$2;
+        var split = systemId.split("_");
+        if(split.length == 2) {
+          if( !_isNumeric(split[0]) || split[0].length != 12 ||
+              !_isNumeric(split[1]) || split[1].length != 1
+          ) {
+            throw ApiException(600, 'System id not following requirements');
+          }
+        }
+        // var mccIds = ids.$1.split('-');
+        // if(mccIds.length > 1) {
+        //   mccId1 = mccIds[0];
+        //   mccId2 = mccIds[1];
+        // }
+      }
+
+      if(systemId.isEmpty) throw ApiException(600 ,'No SystemID found.');
+
+      _dio.options.headers['X-BCM-API-KEY'] = secrets['api_key'];
+      _dio.options.headers['X-BCM-UUID'] = '0000-0000';
+
+      final url = 'https://api.mediacontrolcenter.com/api/v1/system/$systemId/export-full';
+      // final url = secrets['api_url'];
       final urlNow = '$url?start=${_getCurrentDate()}';
 
       final response = await _dio.get(urlNow);
@@ -885,40 +965,58 @@ class ApiCall {
   }
 
   // Download all media gotten from API
-  Future<List<MediaLink>> _downloadMedia(List<MediaLink> media) async {
+  Future<List<MediaLink>> _downloadMedia(
+    List<MediaLink> media, {
+    void Function(int completed, int total)? onProgress,
+  }) async {
     if (kIsWeb) {
       return List<MediaLink>.from(
-        await _cacher.cacheAllMedia(links: media)
+        await _cacher.cacheAllMedia(links: media, onProgress: onProgress)
       );
     } else {
       return List<MediaLink>.from(
-        await _downloader.downloadAllMedia(links: media),
+        await _downloader.downloadAllMedia(
+          links: media,
+          onProgress: onProgress,
+        ),
       );
     }
   }
 
   // Download all frames gotten from API
-  Future<List<FrameLink>> _downloadFrames(List<FrameLink> frames) async {
+  Future<List<FrameLink>> _downloadFrames(
+    List<FrameLink> frames, {
+    void Function(int completed, int total)? onProgress,
+  }) async {
     if (kIsWeb) {
       return List<FrameLink>.from(
-        await _cacher.cacheAllMedia(links: frames)
+        await _cacher.cacheAllMedia(links: frames, onProgress: onProgress)
       );
     } else {
       return List<FrameLink>.from(
-        await _downloader.downloadAllMedia(links: frames),
+        await _downloader.downloadAllMedia(
+          links: frames,
+          onProgress: onProgress,
+        ),
       );
     }
   }
 
   // Download all tickers gotten from API
-  Future<List<TickerLink>> _downloadTickers(List<TickerLink> tickers) async {
+  Future<List<TickerLink>> _downloadTickers(
+    List<TickerLink> tickers, {
+    void Function(int completed, int total)? onProgress,
+  }) async {
     if (kIsWeb) {
       return List<TickerLink>.from(
-        await _cacher.cacheAllMedia(links: tickers)
+        await _cacher.cacheAllMedia(links: tickers, onProgress: onProgress)
       );
     } else {
       return List<TickerLink>.from(
-        await _downloader.downloadAllMedia(links: tickers)
+        await _downloader.downloadAllMedia(
+          links: tickers,
+          onProgress: onProgress,
+        )
       );
     }
   }
@@ -944,6 +1042,21 @@ class ApiCall {
         frameIds: ids.frames,
       );
     }
+  }
+
+  Future<void> fullyDeleteStoredMedia() async {
+    if (kIsWeb) {
+      await _mediaCacheDeletion.fullyDeleteMedia();
+    } else {
+      await _mediaDeletion.fullyDeleteMedia();
+    }
+
+    _currentResponseJson = null;
+    _pendingResponseJson = null;
+    _lastActiveScheduleIds = null;
+    _lastActiveScheduleFrameIds = null;
+    _lastActiveScheduleTickerIds = null;
+    oldJson = null;
   }
 
   @visibleForTesting
@@ -1032,5 +1145,9 @@ class ApiCall {
         '${two(date.hour)}'
         '${two(date.minute)}'
         '${two(date.second)}';
+  }
+
+  bool _isNumeric(String s) {
+    return double.tryParse(s) != null;
   }
 }

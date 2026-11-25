@@ -27,6 +27,8 @@ dependencies:
   web: ^1.1.1
   web_browser_detect: ^2.3.0
   xml: ^7.1.0
+  email_validator: ^3.0.0
+  uuid: ^4.6.0
 
 dev_dependencies:
   flutter_test:
@@ -37,4 +39,5 @@ flutter:
   uses-material-design: true
   assets:
     - assets/
+    - assets/errors/
     - assets/json/secrets.json
