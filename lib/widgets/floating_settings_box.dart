@@ -154,6 +154,7 @@ class _FloatingSettingsBoxState extends State<FloatingSettingsBox> {
         ),
         SizedBox(
           child: TextFormField(
+            key: ValueKey(text),
             enabled: isEnabled,
             focusNode: focusNode,
             readOnly: _startReadOnly || !_isEditing,

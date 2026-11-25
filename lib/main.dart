@@ -74,7 +74,7 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
   String? _imageError;
   String? _videoError;
   ApiException? _preloadError;
-  ApiException? _payloadError;
+  // ApiException? _payloadError;
   ApiException? _criticalErrorHandlingScheduledFor;
   ApiException? _criticalErrorHandledFor;
 
@@ -452,7 +452,10 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
 
   // Check if there's any changes in api or schedules
   // Clear everything if there are changes.
-  Future<void> _checkForMediaChanges({bool checkPayload = false}) async {
+  Future<void> _checkForMediaChanges({
+    bool checkPayload = false,
+    void Function(String phase, int completed, int total)? onDownloadProgress,
+  }) async {
     if (_isPreparingMedia) return;
     if (_isCheckingForChanges) {
       _payloadCheckQueued = _payloadCheckQueued || checkPayload;
@@ -474,11 +477,14 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
 
       // Rebuild all media
       final updatedMediaLinks = await _apiCall
-          .rebuildMediaForCurrentSchedules();
+          .rebuildMediaForCurrentSchedules(onProgress: (completed, total) =>
+              onDownloadProgress?.call('media', completed, total),);
       final updatedFrameLinks = await _apiCall
-          .rebuildFramesForCurrentSchedules();
+          .rebuildFramesForCurrentSchedules(onProgress: (completed, total) =>
+              onDownloadProgress?.call('frames', completed, total),);
       final updatedTickerLinks = await _apiCall
-          .rebuildTickersForCurrentSchedules();
+          .rebuildTickersForCurrentSchedules(onProgress: (completed, total) =>
+              onDownloadProgress?.call('tickers', completed, total),);
 
       // Clear everything for future use
       _isChangingVideo = true;
@@ -1193,7 +1199,70 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
     );
   }
 
+  Widget _buildScreenError(ScreenError screenError, double mediaHeight) {
+    return Container(
+      width: 500,
+      height: mediaHeight,
+      decoration: BoxDecoration(border: Border.all()),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Expanded(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Text(// Logo (REPLACE)
+                  'BCM Logo',
+                  style: TextStyle(
+                    color: Color.fromARGB(255, 255, 98, 0),
+                    fontWeight: FontWeight(1000),
+                    fontSize: 50,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                Text( // Error message
+                  // Message
+                  '${screenError.message}',
+                  style: TextStyle(
+                    color: Color.fromARGB(255, 255, 98, 0),
+                    fontWeight: FontWeight(1000),
+                    fontSize: 30,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                Text(''),
+                Text( // Instructions message
+                  // Message
+                  '${screenError.instructions}',
+                  style: TextStyle(
+                    color: Color.fromARGB(255, 255, 133, 57),
+                    fontWeight: FontWeight(1000),
+                    fontSize: 20,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          ),
+          if(screenError.statusCode != 0)
+            Align( // Status code
+              alignment: Alignment.bottomLeft,
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Text(
+                  'Error ${screenError.statusCode}',
+                  style: const TextStyle(color: Colors.grey, fontSize: 20),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildMediaContent(double mediaHeight) {
+    ScreenError? screenError;
+
     if (_isPreparingMedia) {
       return const CircularProgressIndicator();
     }
@@ -1212,8 +1281,6 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
           width: double.infinity,
         );
       }
-
-      ScreenError? screenError;
 
       switch (_preloadError!.statusCode) {
         case 403:
@@ -1275,64 +1342,7 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
       }
     
       if (screenError != null) {
-        return Container(
-          width: 500,
-          height: mediaHeight,
-          decoration: BoxDecoration(border: Border.all()),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Expanded(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Text(// Logo (REPLACE)
-                      'BCM Logo',
-                      style: TextStyle(
-                        color: Color.fromARGB(255, 255, 98, 0),
-                        fontWeight: FontWeight(1000),
-                        fontSize: 50,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                    Text( // Error message
-                      // Message
-                      '${screenError.message}',
-                      style: TextStyle(
-                        color: Color.fromARGB(255, 255, 98, 0),
-                        fontWeight: FontWeight(1000),
-                        fontSize: 30,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                    Text(''),
-                    Text( // Instructions message
-                      // Message
-                      '${screenError.instructions}',
-                      style: TextStyle(
-                        color: Color.fromARGB(255, 255, 133, 57),
-                        fontWeight: FontWeight(1000),
-                        fontSize: 20,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ],
-                ),
-              ),
-              if(screenError.statusCode != 0)
-                Align( // Status code
-                  alignment: Alignment.bottomLeft,
-                  child: Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: Text(
-                      'Error ${screenError.statusCode}',
-                      style: const TextStyle(color: Colors.grey, fontSize: 20),
-                    ),
-                  ),
-                ),
-            ],
-          ),
-        );
+        return _buildScreenError(screenError, mediaHeight);
       }
     }
 
@@ -1351,6 +1361,7 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
     // If there's an image error, skip media and display the error temporarily.
     if (_imageError != null) {
       _skipMedia();
+
       return Padding(
         padding: const EdgeInsets.all(24),
         child: Text(
@@ -1362,12 +1373,13 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
 
     // Placeholder if no media available
     if (_mediaLinks.isEmpty) {
-      return Image.asset(
-        'assets/placeholder-green.png',
-        fit: BoxFit.contain,
-        height: double.infinity,
-        width: double.infinity,
+      screenError = ScreenError(
+        0, 
+        'No content available at current moment.', 
+        ''
       );
+
+      return _buildScreenError(screenError, mediaHeight);
     }
 
     final media = _currentMedia!;
@@ -1489,10 +1501,12 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
   }
 
   // Build tickers
+  // Build tickers
   Widget _buildTickers(
     double mediaHeight,
     List<String> tickerString, {
     Key? key,
+    // ignore: non_constant_identifier_names
     bool LtoR = false,
     bool inFrame = false,
     int fontSize = 0,
@@ -1542,9 +1556,11 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
           decoration: BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.topCenter,
-              end: Alignment(0, 1),
+              end: Alignment.bottomCenter,
+              // end: Alignment(0, 1),
               colors: <Color>[
                 gradientColor,
+                Color.fromARGB(0, 0, 0, 0),
                 Color.fromARGB(0, 0, 0, 0),
                 Color.fromARGB(0, 0, 0, 0),
               ], // Gradient from https://learnui.design/tools/gradient-generator.html
@@ -1556,11 +1572,12 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
           decoration: BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.bottomCenter,
-              end: const Alignment(0, -0.1),
+              end: Alignment.topCenter,
               colors: <Color>[
                 gradientColor,
-                const Color.fromARGB(0, 0, 0, 0),
-                const Color.fromARGB(0, 0, 0, 0),
+                Color.fromARGB(0, 0, 0, 0),
+                Color.fromARGB(0, 0, 0, 0),
+                Color.fromARGB(0, 0, 0, 0),
               ], // Gradient from https://learnui.design/tools/gradient-generator.html
             ),
           ),
@@ -1617,7 +1634,9 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
               setState(() {
                 _preloadError = null;
               });
-              unawaited(_checkForMediaChanges(checkPayload: true));
+              unawaited(_checkForMediaChanges(
+                checkPayload: true, 
+              ));
             } else {
               setState(() {
                 _checkPayload = true;

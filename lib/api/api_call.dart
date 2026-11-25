@@ -229,32 +229,35 @@ class ApiCall {
   // // Depends if schedules gathered from API get active at this time.
   Future<List<MediaLink>> rebuildMediaForCurrentSchedules({
     DateTime? now,
+    void Function(int completed, int total)? onProgress,
   }) async {
     final responseJson = _pendingResponseJson ?? _currentResponseJson;
     if (responseJson == null) {
       throw StateError('Media must be loaded before rebuilding the playlist.');
     }
-    return _buildMediaFromResponse(responseJson, now: now ?? DateTime.now());
+    return _buildMediaFromResponse(responseJson, now: now ?? DateTime.now(), onProgress: onProgress);
   }
 
   Future<List<FrameLink>> rebuildFramesForCurrentSchedules({
     DateTime? now,
+    void Function(int completed, int total)? onProgress,
   }) async {
     final responseJson = _pendingResponseJson ?? _currentResponseJson;
     if (responseJson == null) {
       throw StateError('Media must be loaded before rebuilding the playlist.');
     }
-    return _buildFramesFromResponse(responseJson, now: now ?? DateTime.now());
+    return _buildFramesFromResponse(responseJson, now: now ?? DateTime.now(), onProgress: onProgress);
   }
 
   Future<(List<TickerLink>, List<TickerLink>)> rebuildTickersForCurrentSchedules({
     DateTime? now,
+    void Function(int completed, int total)? onProgress,
   }) async {
     final responseJson = _pendingResponseJson ?? _currentResponseJson;
     if (responseJson == null) {
       throw StateError('Media must be loaded before rebuilding the playlist.');
     }
-    return _buildTickersFromResponse(responseJson, now: now ?? DateTime.now());
+    return _buildTickersFromResponse(responseJson, now: now ?? DateTime.now(), onProgress: onProgress);
   }
 
   // Get the media Ids gathered from response
@@ -353,6 +356,15 @@ class ApiCall {
     return (images: imageIds, videos: videoIds, frames: frameIds);
   }
 
+  @visibleForTesting
+  Future<List<MediaLink>> buildMediaFromResponse(
+    String jsonString, {
+      required DateTime now,
+    }
+  ) async {
+    return await _buildMediaFromResponse(jsonString, now: now);
+  }
+
   // Build media list from response
   Future<List<MediaLink>> _buildMediaFromResponse(
     String jsonString, {
@@ -400,6 +412,15 @@ class ApiCall {
     return downloadedMediaLinks;
   }
 
+  @visibleForTesting
+  Future<List<FrameLink>> buildFramesFromResponse(
+    String jsonString, {
+      required DateTime now,
+    }
+  ) async {
+    return await _buildFramesFromResponse(jsonString, now: now);
+  }
+
   // Build frames list from response
   Future<List<FrameLink>> _buildFramesFromResponse(
     String jsonString, {
@@ -437,6 +458,15 @@ class ApiCall {
     _pendingResponseJson = null;
     _lastActiveScheduleFrameIds = _scheduleIds(groupSchedules, systemSchedules);
     return downloadedFramesLinks;
+  }
+
+  @visibleForTesting
+  Future<(List<TickerLink>, List<TickerLink>)> buildTickersFromResponse(
+    String jsonString, {
+      required DateTime now,
+    }
+  ) async {
+    return await _buildTickersFromResponse(jsonString, now: now);
   }
 
   // Build ticker lists from response
@@ -478,17 +508,21 @@ class ApiCall {
       secondaryList,
       useSavedTickerStrings: useSavedTickerStrings,
     );
+
     final tickerTotal = tickerLinksMain.length + tickerLinksSecondary.length;
     onProgress?.call(0, tickerTotal);
+
     final downloadedTickerLinksMain = await _downloadTickers(
       tickerLinksMain,
-      onProgress: (completed, _) => onProgress?.call(completed, tickerTotal),
+      onProgress: (completed, _) => 
+          onProgress?.call(completed, tickerTotal),
     );
     final downloadedTickerLinksSecondary = await _downloadTickers(
       tickerLinksSecondary,
       onProgress: (completed, _) =>
           onProgress?.call(tickerLinksMain.length + completed, tickerTotal),
     );
+
     _currentResponseJson = jsonString;
     _pendingResponseJson = null;
     _lastActiveScheduleTickerIds = _scheduleIds(groupSchedules, systemSchedules);
