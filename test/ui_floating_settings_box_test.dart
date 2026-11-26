@@ -11,12 +11,85 @@ import 'package:flutter_video_test/widgets/floating_settings_box.dart';
 
 class _SystemIdMockAdapter implements HttpClientAdapter {
   static const _validRequestPath =
-      '/api/v1/system/251112101888_1/export-full';
+      '/api/v1/system/112233445566_1/export-full';
   static const _validResponse = {
     'group': {'id': 'test-group', 'name': 'Test group'},
     'group_schedules': {'slides': [], 'frames': [], 'tickers': []},
-    'system_schedules': {'slides': [], 'frames': [], 'tickers': []},
-    'playlists': {'slides': [], 'frames': [], 'tickers': []},
+    'system_schedules': {"slides": [
+			{
+				"id": 1558,
+				"type": "slides",
+				"title": "test-shuffle",
+				"description": "",
+				"start": "2026-10-26T00:00:00.000Z",
+				"end": "2026-10-26T16:00:00.000Z",
+				"start_timezone": "",
+				"end_timezone": "",
+				"recurrence_id": 0,
+				"recurrence_rule": "FREQ=DAILY;WKST=SU",
+				"recurrence_exception": "",
+				"playlist": {
+					"id": "0b7bf7e4-d318-401b-ad00-19fab4515426",
+					"type": "custom"
+				},
+				"slide_interval": 7,
+				"slide_shuffle": 0,
+				"slide_override_system_advertising": 0,
+				"slide_advertising_display_duration": 30,
+				"slide_advertising_interval": 1
+			}
+    ], 'frames': [], 'tickers': []},
+    'playlists': {'slides': [
+      {
+				"id": "0b7bf7e4-d318-401b-ad00-19fab4515426",
+				"type": "custom",
+				"title": "test",
+				"owner": "Stijn Vossen",
+				"description": "a",
+				"image_path": "https://s3.eu-central-003.backblazeb2.com/production--remote-webapp/customers/7eac3bea-4a28-4646-accd-616d9af72608/regions/N/playlists/37710073-31c3-43e1-8663-e08c431ab007/37710073-31c3-43e1-8663-e08c431ab007.png",
+				"status": "published",
+				"systems": [],
+				"groups": [],
+				"slides": [
+					{
+						"id": "192d7a78-f001-4df2-9683-d1bdcec81a99",
+						"region_id": "N",
+						"type": "custom",
+						"name": "Spacetravel-0001",
+						"description": null,
+						"media_type": "video",
+						"image_id": null,
+						"image": null,
+						"video_id": "413dbb9f-f24f-4588-9998-9d289a5fbc3b",
+						"video": {
+							"id": "413dbb9f-f24f-4588-9998-9d289a5fbc3b",
+							"name": "Spacetravel-0001.mp4",
+							"path": "videos/413dbb9f-f24f-4588-9998-9d289a5fbc3b",
+							"url": "https://s3.eu-central-003.backblazeb2.com/production--remote-webapp/videos/413dbb9f-f24f-4588-9998-9d289a5fbc3b/Spacetravel-0001.mp4",
+							"mime_type": "video/mp4",
+							"size": 12096840,
+							"in_progress": false,
+							"is_temporary": true,
+							"preview_image": "https://s3.eu-central-003.backblazeb2.com/production--remote-webapp/videos%2F413dbb9f-f24f-4588-9998-9d289a5fbc3b%2FSpacetravel-0001_252.png",
+							"preview_video": null
+						},
+						"is_uploading": false,
+						"playlist_count": 1,
+						"playlists": [
+							{
+								"id": "0b7bf7e4-d318-401b-ad00-19fab4515426",
+								"name": "test"
+							}
+						],
+						"datetime_start": null,
+						"datetime_end": null,
+						"delete_after_end": false,
+						"ad_duration": 7
+					}
+				],
+				"item_count": 6
+			}
+    ], 'frames': [], 'tickers': []},
   };
 
   @override
@@ -64,7 +137,7 @@ void main() {
       expect(floatingSettingsFinder, findsOneWidget);
     });
 
-    testWidgets('Test Focus', (tester) async {
+    testWidgets('Test Focus Settings Box', (tester) async {
       // setup
       await tester.pumpWidget(
         const VideoApp()
@@ -104,7 +177,7 @@ void main() {
       expect(focusNode2!.hasFocus, isFalse);
     });
 
-    testWidgets('Test Regex', (tester) async {
+    testWidgets('Test Regex Settings Box', (tester) async {
       // setup
       await tester.pumpWidget(
         const VideoApp()
@@ -151,26 +224,27 @@ void main() {
       expect(koppelCode2Field.controller!.text, '12345');
     });
 
-    testWidgets('Connect to API', (tester) async {
+    test('Check if connection can be made', () async {
       final dio = Dio()..httpClientAdapter = _SystemIdMockAdapter();
       addTearDown(() => dio.close(force: true));
       final apiCall = ApiCall(dio: dio);
-      await tester.pump();
+      // await tester.pump();
 
       expect(
-        await tester.runAsync(() => apiCall.tryConnect('251112101888')),
+        await apiCall.tryConnect('112233445566'),
         isTrue,
       );
 
-      final rejectedInvalidId = await tester.runAsync(() async {
+      Future<bool> rejectedInvalidId() async {
         try {
           await apiCall.tryConnect('000000000000');
           return false;
         } on Exception {
           return true;
         }
-      });
-      expect(rejectedInvalidId, isTrue);
+      }
+      bool id = await rejectedInvalidId();
+      expect(id, isTrue);
     });
   });
 }

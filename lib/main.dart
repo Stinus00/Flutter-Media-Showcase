@@ -30,7 +30,9 @@ import 'cache_download/media_cacher_stub.dart'
 void main() => runApp(const VideoApp());
 
 class VideoApp extends StatefulWidget {
-  const VideoApp({super.key});
+  const VideoApp({
+    super.key,
+  });
 
   @override
   State<VideoApp> createState() => _VideoAppState();

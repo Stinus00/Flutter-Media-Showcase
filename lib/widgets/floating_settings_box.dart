@@ -430,6 +430,7 @@ class _FloatingSettingsBoxState extends State<FloatingSettingsBox> {
                           style: TextStyle(fontSize: 25.0, fontWeight: FontWeight(600), color: _textColor),
                         ),
                         ElevatedButton(
+                          key: ValueKey('close-button'),
                           focusNode: _closeFocusNode,
                           onPressed: widget.onCloseSettings,
                           style: ButtonStyle(
@@ -534,6 +535,7 @@ class _FloatingSettingsBoxState extends State<FloatingSettingsBox> {
                           !_startReadOnly ?
                           Expanded(
                             child: ElevatedButton(
+                              key: ValueKey('submit-button'),
                               focusNode: _submitFocusNode,
                               onPressed: _isConnecting ? null : () async {
                                 // Validate returns true if the form is valid, or false otherwise.
