@@ -1176,7 +1176,7 @@ void main() {
       List<TickerLink> list2;
       (list1, list2) = await apiCall.buildTickersFromResponse(
         jsonEncode(decodeScheduleResponse()),
-        now: DateTime(2026, 11, 5, 10)
+        now: DateTime(2026, 11, 5, 9)
       );
 
       expect(list1, hasLength(5));
@@ -1193,6 +1193,48 @@ void main() {
 
       expect(list1, isEmpty);
       expect(list2, hasLength(1));
+    });
+  });
+
+  group('getSpecificApiResponses', () {
+    late Directory tempDirectory;
+    late ApiCall apiCall;
+
+    setUp(() async {
+      tempDirectory = await Directory.systemTemp.createTemp(
+        'schedule-save-test-',
+      );
+      apiCall = ApiCall(
+        downloader: _TestMediaDownloader(
+          Directory('${tempDirectory.path}/documents'),
+        ),
+      );
+    });
+
+    tearDown(() async {
+      await tempDirectory.delete(recursive: true);
+    });
+
+    test('Invalid API response', () async {
+      String scheduleResponse = r'''
+        {}
+      ''';
+
+      expect(() async => await apiCall.buildMediaFromResponse(
+        scheduleResponse,
+        now: DateTime(2026, 11, 5, 9)
+      ), throwsNoSuchMethodError);
+    });
+
+    test('Invalid API response', () async {
+      String scheduleResponse = r'''
+        {}
+      ''';
+
+      expect(() async => await apiCall.buildMediaFromResponse(
+        scheduleResponse,
+        now: DateTime(2026, 11, 5, 9)
+      ), throwsNoSuchMethodError);
     });
   });
 }

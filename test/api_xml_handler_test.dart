@@ -8,12 +8,13 @@ void main() {
     test(
       'converts block position and size into rectangle coordinates',
       () async {
-        const xml = '''
-<Root>
-  <VB_BlockPosition>120;45</VB_BlockPosition>
-  <VB_BlockSize>640;360</VB_BlockSize>
-</Root>
-''';
+        const xml = 
+        '''
+          <Root>
+            <VB_BlockPosition>120;45</VB_BlockPosition>
+            <VB_BlockSize>640;360</VB_BlockSize>
+          </Root>
+        ''';
 
         final coordinates = await handler.getCoordinates(xml);
 

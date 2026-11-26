@@ -375,41 +375,48 @@ class ApiCall {
     final shuffleList = <dynamic>[];
     final mainList = <dynamic>[];
     final combinedList = <dynamic>[];
-    final mapJson = jsonDecode(jsonString) as Map<String, dynamic>;
-    final playlists = mapJson['playlists']['slides'];
-    _playlistsMapMedia.clear();
-    _mapPlaylists(playlists);
 
-    final groupSchedules = _getGroupSchedules(
-      media,
-      mapJson,
-      'slides',
-      now: now,
-    );
-    final systemSchedules = _getSystemSchedules(
-      media,
-      mapJson,
-      'slides',
-      now: now,
-    );
+    try {
 
-    _getPlaylistData(media, shuffleList, mainList, 'slides');
-    shuffleList.shuffle();
+      final mapJson = jsonDecode(jsonString) as Map<String, dynamic>;
+      final playlists = mapJson['playlists']['slides'];
+      _playlistsMapMedia.clear();
+      _mapPlaylists(playlists);
 
-    combinedList
-      ..addAll(mainList)
-      ..addAll(shuffleList);
+      final groupSchedules = _getGroupSchedules(
+        media,
+        mapJson,
+        'slides',
+        now: now,
+      );
+      final systemSchedules = _getSystemSchedules(
+        media,
+        mapJson,
+        'slides',
+        now: now,
+      );
 
-    final mediaLinks = await _convertMediaToMediaLink(combinedList);
-    final downloadedMediaLinks = await _downloadMedia(
-      mediaLinks,
-      onProgress: onProgress,
-    );
-    await _saveApiResponse(jsonString);
-    _currentResponseJson = jsonString;
-    _pendingResponseJson = null;
-    _lastActiveScheduleIds = _scheduleIds(groupSchedules, systemSchedules);
-    return downloadedMediaLinks;
+      _getPlaylistData(media, shuffleList, mainList, 'slides');
+      shuffleList.shuffle();
+
+      combinedList
+        ..addAll(mainList)
+        ..addAll(shuffleList);
+
+      final mediaLinks = await _convertMediaToMediaLink(combinedList);
+      final downloadedMediaLinks = await _downloadMedia(
+        mediaLinks,
+        onProgress: onProgress,
+      );
+      await _saveApiResponse(jsonString);
+      _currentResponseJson = jsonString;
+      _pendingResponseJson = null;
+      _lastActiveScheduleIds = _scheduleIds(groupSchedules, systemSchedules);
+      return downloadedMediaLinks;
+    } catch (error) {
+      debugPrint('Build Media Error: $error');
+      rethrow;
+    }
   }
 
   @visibleForTesting
