@@ -41,6 +41,8 @@ class VideoApp extends StatefulWidget {
 class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
   final MediaCacher _mediaCacher = MediaCacher();
   final ApiCall _apiCall = ApiCall();
+  final GlobalKey<ScaffoldMessengerState> _scaffoldMessengerKey =
+      GlobalKey<ScaffoldMessengerState>();
   final FocusNode _nextPlaylistButtonFocusNode = FocusNode(
     debugLabel: 'Refresh playlist button',
   );
@@ -60,6 +62,9 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
   GlobalKey _tickerKeyFor(int index) =>
       _tickerKeys.putIfAbsent(index, GlobalKey.new);
 
+  // Download progress
+  final ValueNotifier<String> _downloadProgress = ValueNotifier('Starting Download...');
+
   // Media Paths
   String? _imagePath;
   String? _framePath;
@@ -76,7 +81,6 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
   String? _imageError;
   String? _videoError;
   ApiException? _preloadError;
-  // ApiException? _payloadError;
   ApiException? _criticalErrorHandlingScheduledFor;
   ApiException? _criticalErrorHandledFor;
 
@@ -149,7 +153,8 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
       },
     );
     unawaited(_checkConnectivity());
-    unawaited(_prepareMedia(startChangeChecks: true));
+    unawaited(_getInitialDownloadProgress(startChangeChecks: true));
+    // unawaited(_prepareMedia(startChangeChecks: true));
   }
 
   void _handleButtonFocusChange() {
@@ -308,21 +313,24 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
     _payloadCheckTimer?.cancel();
     _tickerCheckTimer?.cancel();
 
-    _scheduleCheckTimer = Timer.periodic(const Duration(minutes: 1), (_) {
+    _scheduleCheckTimer = Timer.periodic(const Duration(minutes: 1), (_) async {
       // 1 minute
       // Check if schedules have changed
       if (_mediaLinks.isEmpty) {
         setState(() {
           _preloadError = null;
         });
-        unawaited(_checkForMediaChanges());
+
+        await _getDownloadProgress();
+
+        // unawaited(_checkForMediaChanges());
       } else {
         setState(() {
           _checkSchedule = true;
         });
       }
     });
-    _payloadCheckTimer = Timer.periodic(const Duration(minutes: 15), (_) {
+    _payloadCheckTimer = Timer.periodic(const Duration(minutes: 15), (_) async { // 15 minutes
       // 15 minutes
       // Check if API callback has changed
       if (_hasNetworkConnection == true) {
@@ -330,7 +338,21 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
           setState(() {
             _preloadError = null;
           });
-          unawaited(_checkForMediaChanges(checkPayload: true));
+
+          await _getDownloadProgress(checkPayload: true);
+
+          // await _checkForMediaChanges(checkPayload: true, onDownloadProgress: (
+          //   phase,
+          //   completed,
+          //   total,
+          // ) {
+          //   // if (mounted) {
+          //     _downloadProgress.value =
+          //         'Downloading $phase: $completed/$total';
+          //   // }
+          // });
+
+          // unawaited(_checkForMediaChanges(checkPayload: true));
         } else {
           setState(() {
             _checkPayload = true;
@@ -452,6 +474,107 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
     });
   }
 
+  Future<void> _getDownloadProgress({
+    bool checkPayload = false,
+  }) async {
+    _downloadProgress.value = 'Starting Download...';
+
+    final messenger = _scaffoldMessengerKey.currentState;
+    if (messenger == null) {
+      throw StateError('ScaffoldMessenger is not available');
+    }
+
+    messenger.showSnackBar(
+      SnackBar(
+        content: ValueListenableBuilder<String>(
+          valueListenable: _downloadProgress,
+          builder: (context, progress, _) => Text(progress),
+        ),
+        duration: const Duration(days: 1),
+      ),
+    );
+
+    await _checkForMediaChanges(
+      checkPayload: checkPayload, 
+      onDownloadProgress: (
+        phase,
+        completed,
+        total,
+      ) {
+        // if (mounted) {
+          _downloadProgress.value =
+              'Downloading $phase: $completed/$total';
+        // }
+      }
+    );
+
+    if(mounted) {
+      messenger.hideCurrentSnackBar();
+    }
+    await messenger
+      .showSnackBar(
+        const SnackBar(
+          content: Text('Completed!'),
+          backgroundColor: Colors.green,
+          
+          duration: Duration(seconds: 3),
+        ),
+      )
+      .closed;
+  }
+
+  Future<void> _getInitialDownloadProgress({
+    bool startChangeChecks = false,
+  }) async {
+    await WidgetsBinding.instance.endOfFrame;
+    if (!mounted) return;
+
+    _downloadProgress.value = 'Starting Download...';
+
+    final messenger = _scaffoldMessengerKey.currentState;
+    if (messenger == null) {
+      throw StateError('ScaffoldMessenger is not available');
+    }
+
+    messenger.showSnackBar(
+      SnackBar(
+        content: ValueListenableBuilder<String>(
+          valueListenable: _downloadProgress,
+          builder: (context, progress, _) => Text(progress),
+        ),
+        duration: const Duration(days: 1),
+      ),
+    );
+
+    await _prepareMedia(
+      startChangeChecks: startChangeChecks,
+      onDownloadProgress: (
+        phase,
+        completed,
+        total,
+      ) {
+        // if (mounted) {
+          _downloadProgress.value =
+              'Downloading $phase: $completed/$total';
+        // }
+      }
+    );
+
+    if(mounted) {
+      messenger.hideCurrentSnackBar();
+    }
+    await messenger
+      .showSnackBar(
+        const SnackBar(
+          content: Text('Completed!'),
+          backgroundColor: Colors.green,
+          
+          duration: Duration(seconds: 3),
+        ),
+      )
+      .closed;
+  }
+
   // Check if there's any changes in api or schedules
   // Clear everything if there are changes.
   Future<void> _checkForMediaChanges({
@@ -476,17 +599,17 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
         await _apiCall.cleanupStoredMedia();
         return;
       }
-
+      
       // Rebuild all media
-      final updatedMediaLinks = await _apiCall
-          .rebuildMediaForCurrentSchedules(onProgress: (completed, total) =>
-              onDownloadProgress?.call('media', completed, total),);
-      final updatedFrameLinks = await _apiCall
-          .rebuildFramesForCurrentSchedules(onProgress: (completed, total) =>
-              onDownloadProgress?.call('frames', completed, total),);
-      final updatedTickerLinks = await _apiCall
-          .rebuildTickersForCurrentSchedules(onProgress: (completed, total) =>
-              onDownloadProgress?.call('tickers', completed, total),);
+    final updatedMediaLinks = await _apiCall
+        .rebuildMediaForCurrentSchedules(onProgress: (completed, total) =>
+            onDownloadProgress?.call('media', completed, total),);
+    final updatedFrameLinks = await _apiCall
+        .rebuildFramesForCurrentSchedules(onProgress: (completed, total) =>
+            onDownloadProgress?.call('frames', completed, total),);
+    final updatedTickerLinks = await _apiCall
+        .rebuildTickersForCurrentSchedules(onProgress: (completed, total) =>
+            onDownloadProgress?.call('tickers', completed, total),);
 
       // Clear everything for future use
       _isChangingVideo = true;
@@ -541,7 +664,7 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
       _isCheckingForChanges = false;
       if (_payloadCheckQueued && mounted) {
         _payloadCheckQueued = false;
-        unawaited(_checkForMediaChanges(checkPayload: true));
+        unawaited(_checkForMediaChanges(checkPayload: true, onDownloadProgress: onDownloadProgress));
       }
     }
   }
@@ -959,11 +1082,13 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
   Future<void> _checkPendingMediaChanges() async {
     if (_checkSchedule) {
       _checkSchedule = false;
-      await _checkForMediaChanges();
+      await _getDownloadProgress();
+      // await _checkForMediaChanges();
     }
     if (_checkPayload) {
       _checkPayload = false;
-      await _checkForMediaChanges(checkPayload: true);
+      await _getDownloadProgress(checkPayload: true);
+      // await _checkForMediaChanges(checkPayload: true);
     }
   }
 
@@ -992,6 +1117,7 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      scaffoldMessengerKey: _scaffoldMessengerKey,
       title: 'Video Demo',
       theme: ThemeData(scaffoldBackgroundColor: Colors.black),
       home: Scaffold(
@@ -1082,6 +1208,8 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
                     )
                   else
                     Center(child: _buildMedia(canvasHeight * scale)),
+
+                  // Show Buttons layout
                   AnimatedSwitcher(
                     duration: const Duration(milliseconds: 200),
                     transitionBuilder: (child, animation) {
@@ -1089,6 +1217,8 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
                     },
                     child: _showButtons ? _buildButtonShowcase() : null,
                   ),
+
+                  // Show Settings screen
                   if (_showSettings)
                     FloatingSettingsBox(
                       onConnected: (onProgress) async {
@@ -1111,6 +1241,8 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
                         return await _apiCall.tryConnect(systemId);
                       },
                     ),
+                  
+                  // Show no internet connection
                   if (_hasNetworkConnection == false)
                     Align(
                       alignment: Alignment.topLeft,
@@ -1198,67 +1330,6 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
             ),
           ),
       ],
-    );
-  }
-
-  Widget _buildScreenError(ScreenError screenError, double mediaHeight) {
-    return Container(
-      width: 500,
-      height: mediaHeight,
-      decoration: BoxDecoration(border: Border.all()),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Expanded(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Text(// Logo (REPLACE)
-                  'BCM Logo',
-                  style: TextStyle(
-                    color: Color.fromARGB(255, 255, 98, 0),
-                    fontWeight: FontWeight(1000),
-                    fontSize: 50,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                Text( // Error message
-                  // Message
-                  '${screenError.message}',
-                  style: TextStyle(
-                    color: Color.fromARGB(255, 255, 98, 0),
-                    fontWeight: FontWeight(1000),
-                    fontSize: 30,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                Text(''),
-                Text( // Instructions message
-                  // Message
-                  '${screenError.instructions}',
-                  style: TextStyle(
-                    color: Color.fromARGB(255, 255, 133, 57),
-                    fontWeight: FontWeight(1000),
-                    fontSize: 20,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              ],
-            ),
-          ),
-          if(screenError.statusCode != 0)
-            Align( // Status code
-              alignment: Alignment.bottomLeft,
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: Text(
-                  'Error ${screenError.statusCode}',
-                  style: const TextStyle(color: Colors.grey, fontSize: 20),
-                ),
-              ),
-            ),
-        ],
-      ),
     );
   }
 
@@ -1426,6 +1497,72 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
         : const CircularProgressIndicator();
   }
 
+  // Widget to show errors
+  // // 403 & 404 : Stop playing media, show error
+  // // 500 & No internet error (480) : Continue playing media. If no content show error.
+  // // No connection (600) : Show error
+  // // No content to show (0) : Show error
+  Widget _buildScreenError(ScreenError screenError, double mediaHeight) {
+    return Container(
+      width: 500,
+      height: 500,
+      decoration: BoxDecoration(border: Border.all()),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Expanded(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Text(// Logo (REPLACE)
+                  'BCM Logo',
+                  style: TextStyle(
+                    color: Color.fromARGB(255, 255, 98, 0),
+                    fontWeight: FontWeight(1000),
+                    fontSize: 50,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                Text( // Error message
+                  // Message
+                  '${screenError.message}',
+                  style: TextStyle(
+                    color: Color.fromARGB(255, 255, 98, 0),
+                    fontWeight: FontWeight(1000),
+                    fontSize: 30,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                Text(''),
+                Text( // Instructions message
+                  // Message
+                  '${screenError.instructions}',
+                  style: TextStyle(
+                    color: Color.fromARGB(255, 255, 133, 57),
+                    fontWeight: FontWeight(1000),
+                    fontSize: 20,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          ),
+          if(screenError.statusCode != 0)
+            Align( // Status code
+              alignment: Alignment.bottomLeft,
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Text(
+                  'Error ${screenError.statusCode}',
+                  style: const TextStyle(color: Colors.grey, fontSize: 20),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
   void _handleMediaImageError(MediaLink media, Object error) {
     if (!identical(_currentMedia, media) || _imageError != null) return;
     scheduleMicrotask(() {
@@ -1502,7 +1639,6 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
           );
   }
 
-  // Build tickers
   // Build tickers
   Widget _buildTickers(
     double mediaHeight,
@@ -1629,16 +1765,15 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
           ),
           foregroundColor: Colors.white,
           elevation: 0,
-          onPressed: () {
+          onPressed: () async {
             if (_isPreparingMedia) return;
 
             if (_mediaLinks.isEmpty) {
               setState(() {
                 _preloadError = null;
               });
-              unawaited(_checkForMediaChanges(
-                checkPayload: true, 
-              ));
+
+              await _getDownloadProgress(checkPayload: true);
             } else {
               setState(() {
                 _checkPayload = true;
