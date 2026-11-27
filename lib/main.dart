@@ -313,7 +313,7 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
     _payloadCheckTimer?.cancel();
     _tickerCheckTimer?.cancel();
 
-    _scheduleCheckTimer = Timer.periodic(const Duration(minutes: 1), (_) async {
+    _scheduleCheckTimer = Timer.periodic(const Duration(minutes: 1), (_) async { // 1 minute
       // 1 minute
       // Check if schedules have changed
       if (_mediaLinks.isEmpty) {
@@ -501,26 +501,29 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
         completed,
         total,
       ) {
-        // if (mounted) {
+        if (mounted) {
           _downloadProgress.value =
               'Downloading $phase: $completed/$total';
-        // }
+        }
       }
     );
 
     if(mounted) {
       messenger.hideCurrentSnackBar();
     }
-    await messenger
-      .showSnackBar(
-        const SnackBar(
-          content: Text('Completed!'),
-          backgroundColor: Colors.green,
-          
-          duration: Duration(seconds: 3),
-        ),
-      )
-      .closed;
+    
+    if(_downloadProgress.value != 'Starting Download...') {
+      await messenger
+        .showSnackBar(
+          const SnackBar(
+            content: Text('Completed!'),
+            backgroundColor: Colors.green,
+            
+            duration: Duration(seconds: 3),
+          ),
+        )
+        .closed;
+    }
   }
 
   Future<void> _getInitialDownloadProgress({
@@ -1118,7 +1121,7 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
   Widget build(BuildContext context) {
     return MaterialApp(
       scaffoldMessengerKey: _scaffoldMessengerKey,
-      title: 'Video Demo',
+      title: 'BCM Multi Media Player Demo',
       theme: ThemeData(scaffoldBackgroundColor: Colors.black),
       home: Scaffold(
         body: LayoutBuilder(
@@ -1672,7 +1675,7 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
       tickerString,
       tickerSpeed: tickerSpeed,
       tickerFontSize: fontSizeInternal,
-      tickerSymbol: '•-|-•',
+      tickerSymbol: '•',
       leftToRight: LtoR,
       border: border,
       borderColor: borderColor,

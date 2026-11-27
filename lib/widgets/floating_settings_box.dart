@@ -432,11 +432,12 @@ class _FloatingSettingsBoxState extends State<FloatingSettingsBox> {
                         ElevatedButton(
                           key: ValueKey('close-button'),
                           focusNode: _closeFocusNode,
-                          onPressed: widget.onCloseSettings,
+                          onPressed: _isConnecting ? null : widget.onCloseSettings,
                           style: ButtonStyle(
                             foregroundColor: WidgetStatePropertyAll<Color>(_textColor),
                             backgroundColor: WidgetStateProperty<Color>.fromMap(
                               <WidgetStatesConstraint, Color>{
+                                // WidgetState.disabled: Colors.white,
                                 WidgetState.any: Colors.transparent,
                               },
                             ),
@@ -448,7 +449,7 @@ class _FloatingSettingsBoxState extends State<FloatingSettingsBox> {
                               },
                             ),
                           ),
-                          child: Text('X'),
+                          child: _isConnecting ? null : Text('X'),
                         )
                       ],
                     ),

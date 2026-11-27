@@ -29,6 +29,7 @@ dependencies:
   xml: ^7.1.0
   email_validator: ^3.0.0
   uuid: ^4.6.0
+  flutter_launcher_icons: ^0.14.4
 
 dev_dependencies:
   flutter_test:

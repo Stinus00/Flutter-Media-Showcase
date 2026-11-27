@@ -5,6 +5,7 @@ set -e
 #clean flutter
 flutter clean
 flutter pub get
+flutter pub run flutter_launcher_icons
 
 #build web
 flutter build web
@@ -21,9 +22,31 @@ mv \
   build/app/outputs/bundle/release/app-release-universal.apks \
   build/app/outputs/bundle/release/app-release-universal.zip
 
-#build macos PUT LAST WILL ALWAYS FAIL
-flutter precache --macos
-flutter build macos
+OS="`uname`"
+case $OS in
+  'Linux')
+    OS='Linux'
+    ;;
+  'FreeBSD')
+    OS='FreeBSD'
+    ;;
+  'WindowsNT')
+    OS='Windows'
+    #build windows
+    flutter build windows
+    ;;
+  'Darwin') 
+    OS='Mac'
+    #build macos
+    flutter precache --macos
+    flutter build macos
+    ;;
+  'SunOS')
+    OS='Solaris'
+    ;;
+  'AIX') ;;
+  *) ;;
+esac
 
 echo "-----------------------------"
 echo ""
