@@ -1136,7 +1136,7 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
   Widget build(BuildContext context) {
     return MaterialApp(
       scaffoldMessengerKey: _scaffoldMessengerKey,
-      title: 'BCM Multi Media Player Demo',
+      title: 'BCM Media Player Demo',
       theme: ThemeData(scaffoldBackgroundColor: Colors.black),
       home: Scaffold(
         body: LayoutBuilder(

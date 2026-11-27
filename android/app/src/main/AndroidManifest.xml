@@ -2,7 +2,7 @@
     <uses-permission android:name="android.permission.INTERNET" />
 
     <application
-        android:label="BCM Media Player"BCM"
+        android:label="BCM Media Player"
         android:name="${applicationName}"
         android:icon="@mipmap/launcher_icon">
         <activity
