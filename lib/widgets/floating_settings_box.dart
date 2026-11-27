@@ -52,6 +52,7 @@ class _FloatingSettingsBoxState extends State<FloatingSettingsBox> {
   bool _isConnecting = false;
   bool _startReadOnly = false;
   bool _disableCancel = false;
+  bool _showConfirmationBox = false;
   String? _connectionError;
 
   final _borderColor = Color.fromARGB(255, 57, 68, 92);
@@ -73,6 +74,24 @@ class _FloatingSettingsBoxState extends State<FloatingSettingsBox> {
       if (mounted) {
         unawaited(initTextFields());
         _settingsFocusScope.requestFocus(_systemIdFocusNode);
+      }
+    });
+  }
+
+  Future<void> _disconnectSystem() async {
+    await widget.onDisconnected();
+
+    await _file.storeIds(mccAppId: '', systemId: '');
+    _systemIdController.text = '';
+    _mccId1Controller.text = '';
+    _mccId2Controller.text = '';
+    setState(() {
+      _startReadOnly = false;
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _disconnectFocusNode.unfocus();
+        _settingsFocusScope.requestFocus(_submitFocusNode);
       }
     });
   }
@@ -237,19 +256,87 @@ class _FloatingSettingsBoxState extends State<FloatingSettingsBox> {
     focusNode.requestFocus();
   }
 
+  ButtonStyle _elevatedButtonStyle({
+    required Color textColor,
+    required Color disabledColor,
+    required Color focusedColor,
+    required Color idleColor,
+  }) {
+    return ButtonStyle(
+      foregroundColor: WidgetStatePropertyAll<Color>(textColor),
+      backgroundColor: WidgetStateProperty<Color>.fromMap(
+        <WidgetStatesConstraint, Color>{
+          WidgetState.disabled: disabledColor,
+          WidgetState.pressed: focusedColor,
+          WidgetState.focused | WidgetState.hovered: focusedColor,
+          WidgetState.any: idleColor,
+        },
+      ),
+      side: WidgetStateProperty<BorderSide>.fromMap(
+        <WidgetStatesConstraint, BorderSide>{
+          WidgetState.disabled: BorderSide(color: disabledColor),
+          WidgetState.pressed: BorderSide(color: Colors.white, width: _buttonBorderWidth),
+          WidgetState.focused | WidgetState.hovered: BorderSide(color: Colors.white, width: _buttonBorderWidth),
+          WidgetState.any: BorderSide(color: idleColor),
+        },
+      ),
+    );
+  }
+
+  Future<void> _buildConfirmationDialog() async {
+    return showDialog<void>(
+      context: context,
+      barrierDismissible: false, // user must tap button!
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('Are you sure you want to disconnect?', style: TextStyle(color: _textColor)),
+          backgroundColor: _backgroundColor,
+          content: SingleChildScrollView(
+            child: ListBody(
+              children: <Widget>[
+                Text('Disconnecting will delete all media from this screen.', style: TextStyle(color: _textColor)),
+                Text('You will not be able to reconnect without WiFi', style: TextStyle(color: _textColor)),
+              ],
+            ),
+          ),
+          actions: <Widget>[
+            ElevatedButton(
+              style: _elevatedButtonStyle(
+                textColor: _textColor, 
+                disabledColor: _disabledButtonIdleColor, 
+                focusedColor: Colors.red, 
+                idleColor: Color.fromARGB(255, 255, 0, 0),
+              ),
+              child: const Text('Disconnect'),
+              onPressed: () {
+               _disconnectSystem();
+                Navigator.of(context).pop();
+              },
+            ),
+            ElevatedButton(
+              style: _elevatedButtonStyle(
+                textColor: _textColor, 
+                disabledColor: _disabledButtonIdleColor, 
+                focusedColor: _focusColor, 
+                idleColor: _buttonIdleColor
+              ),
+              child: const Text('Cancel'),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
       width: 500,
       decoration: BoxDecoration(
           color: _backgroundColor,
-          // boxShadow: [
-          //   BoxShadow(
-          //       offset: Offset.fromDirection(1, 2),
-          //       spreadRadius: 1,
-          //       blurRadius: 3,
-          //       color: Colors.grey)
-          // ],
           borderRadius: const BorderRadius.all(Radius.circular(20)),
           border: Border.all(
               color: _borderColor,
@@ -433,21 +520,11 @@ class _FloatingSettingsBoxState extends State<FloatingSettingsBox> {
                           key: ValueKey('close-button'),
                           focusNode: _closeFocusNode,
                           onPressed: _isConnecting ? null : widget.onCloseSettings,
-                          style: ButtonStyle(
-                            foregroundColor: WidgetStatePropertyAll<Color>(_textColor),
-                            backgroundColor: WidgetStateProperty<Color>.fromMap(
-                              <WidgetStatesConstraint, Color>{
-                                // WidgetState.disabled: Colors.white,
-                                WidgetState.any: Colors.transparent,
-                              },
-                            ),
-                            side: WidgetStateProperty<BorderSide>.fromMap(
-                              <WidgetStatesConstraint, BorderSide>{
-                                WidgetState.pressed: BorderSide(color: Colors.white, width: _buttonBorderWidth),
-                                WidgetState.focused | WidgetState.hovered: BorderSide(color: Colors.white, width: _buttonBorderWidth),
-                                WidgetState.any: BorderSide(color: Colors.transparent),
-                              },
-                            ),
+                          style: _elevatedButtonStyle(
+                            textColor: _textColor, 
+                            disabledColor: Colors.transparent, 
+                            focusedColor: Colors.transparent, 
+                            idleColor: Colors.transparent
                           ),
                           child: _isConnecting ? null : Text('X'),
                         )
@@ -647,65 +724,25 @@ class _FloatingSettingsBoxState extends State<FloatingSettingsBox> {
                                   }
                                 }
                               },
-                              style: ButtonStyle(
-                                foregroundColor: WidgetStatePropertyAll<Color>(_textColor),
-                                backgroundColor: WidgetStateProperty<Color>.fromMap(
-                                  <WidgetStatesConstraint, Color>{
-                                    WidgetState.disabled: _disabledButtonIdleColor,
-                                    WidgetState.pressed: _buttonFocusColor,
-                                    WidgetState.focused | WidgetState.hovered: _buttonFocusColor,
-                                    WidgetState.any: _buttonIdleColor,
-                                  },
-                                ),
-                                side: WidgetStateProperty<BorderSide>.fromMap(
-                                  <WidgetStatesConstraint, BorderSide>{
-                                    WidgetState.disabled: BorderSide(color: _disabledButtonIdleColor),
-                                    WidgetState.pressed: BorderSide(color: Colors.white, width: _buttonBorderWidth),
-                                    WidgetState.focused | WidgetState.hovered: BorderSide(color: Colors.white, width: _buttonBorderWidth),
-                                    WidgetState.any: BorderSide(color: _buttonIdleColor),
-                                  },
-                                ),
+                              style: _elevatedButtonStyle(
+                                textColor: _textColor, 
+                                disabledColor: _disabledButtonIdleColor, 
+                                focusedColor: _buttonFocusColor, 
+                                idleColor: _buttonIdleColor
                               ),
                               child: const Text('Submit'),
                             ),
                           ) : Expanded(
                             child: ElevatedButton(
                               focusNode: _disconnectFocusNode,
-                              style: ButtonStyle(
-                                foregroundColor: WidgetStatePropertyAll<Color>(_textColor),
-                                backgroundColor: WidgetStateProperty<Color>.fromMap(
-                                  <WidgetStatesConstraint, Color>{
-                                    WidgetState.disabled: _disabledButtonIdleColor,
-                                    WidgetState.pressed: Colors.red,
-                                    WidgetState.focused | WidgetState.hovered: Colors.red,
-                                    WidgetState.any: Color.fromARGB(255, 255, 0, 0),
-                                  },
-                                ),
-                                side: WidgetStateProperty<BorderSide>.fromMap(
-                                  <WidgetStatesConstraint, BorderSide>{
-                                    WidgetState.disabled: BorderSide(color: _disabledButtonIdleColor),
-                                    WidgetState.pressed: BorderSide(color: Colors.white, width: _buttonBorderWidth),
-                                    WidgetState.focused | WidgetState.hovered: BorderSide(color: Colors.white, width: _buttonBorderWidth),
-                                    WidgetState.any: BorderSide(color: Color.fromARGB(255, 255, 0, 0)),
-                                  },
-                                ),
+                              style: _elevatedButtonStyle(
+                                textColor: _textColor, 
+                                disabledColor: _disabledButtonIdleColor, 
+                                focusedColor: Colors.red, 
+                                idleColor: Color.fromARGB(255, 255, 0, 0),
                               ),
                               onPressed: () async {
-                                await widget.onDisconnected();
-
-                                await _file.storeIds(mccAppId: '', systemId: '');
-                                _systemIdController.text = '';
-                                _mccId1Controller.text = '';
-                                _mccId2Controller.text = '';
-                                setState(() {
-                                  _startReadOnly = false;
-                                });
-                                WidgetsBinding.instance.addPostFrameCallback((_) {
-                                  if (mounted) {
-                                    _disconnectFocusNode.unfocus();
-                                    _settingsFocusScope.requestFocus(_submitFocusNode);
-                                  }
-                                });
+                                _buildConfirmationDialog();
                               }, 
                               child: const Text('Disconnect Screen')
                             ),
@@ -715,24 +752,11 @@ class _FloatingSettingsBoxState extends State<FloatingSettingsBox> {
                             child: ElevatedButton(
                               focusNode: _cancelFocusNode,
                               onPressed: _disableCancel ? null : widget.onCloseSettings,
-                              style: ButtonStyle(
-                                foregroundColor: WidgetStatePropertyAll<Color>(_textColor),
-                                backgroundColor: WidgetStateProperty<Color>.fromMap(
-                                  <WidgetStatesConstraint, Color>{
-                                    WidgetState.disabled: _disabledButtonIdleColor,
-                                    WidgetState.pressed: _buttonFocusColor,
-                                    WidgetState.focused | WidgetState.hovered: _buttonFocusColor,
-                                    WidgetState.any: _buttonIdleColor,
-                                  },
-                                ),
-                                side: WidgetStateProperty<BorderSide>.fromMap(
-                                  <WidgetStatesConstraint, BorderSide>{
-                                    WidgetState.disabled: BorderSide(color: _disabledButtonIdleColor),
-                                    WidgetState.pressed: BorderSide(color: Colors.white, width: _buttonBorderWidth),
-                                    WidgetState.focused | WidgetState.hovered: BorderSide(color: Colors.white, width: _buttonBorderWidth),
-                                    WidgetState.any: BorderSide(color: _buttonIdleColor),
-                                  },
-                                ),
+                              style: _elevatedButtonStyle(
+                                textColor: _textColor, 
+                                disabledColor: _disabledButtonIdleColor, 
+                                focusedColor: _buttonFocusColor, 
+                                idleColor: _buttonIdleColor
                               ),
                               child: const Text('Cancel'),
                             ),

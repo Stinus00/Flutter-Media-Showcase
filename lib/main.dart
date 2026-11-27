@@ -213,12 +213,14 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
     try {
       await SystemDataLoginFile().storeUuid();
 
+      // Get all media (images and videos) from the API
       if (_mediaLinks.isEmpty) {
         _mediaLinks = await _apiCall.getMediaFromApi(
           onProgress: (completed, total) =>
               onDownloadProgress?.call('media', completed, total),
         );
       }
+      // Get all frames from the API
       if (_frameLinks.isEmpty) {
         _frameLinks = await _apiCall.getFrameLinksFromApi(
           onProgress: (completed, total) =>
@@ -226,6 +228,7 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
         );
       }
 
+      // Get all tickers from the API and divide them into 2 lists
       List<TickerLink> tickerLinksOne = [];
       List<TickerLink> tickerLinksTwo = [];
 
@@ -252,6 +255,13 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
       if (startChangeChecks) {
         _startChangeChecks();
       }
+      // If error is an internet error and not on web:
+      // // Initialize saved API data
+      // // Initialize saved media
+      // // Initialize saved frames
+      // // Initialize custom tickers
+
+      // // Send 480 "No Connection" error to show if there's no saved media.
       if (!kIsWeb && error.type == DioExceptionType.connectionError) {
         final cached = await _apiCall.loadSavedApiMedia();
         if (cached.media.isNotEmpty) {
@@ -1517,15 +1527,19 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Text(// Logo (REPLACE)
-                  'BCM Logo',
-                  style: TextStyle(
-                    color: Color.fromARGB(255, 255, 98, 0),
-                    fontWeight: FontWeight(1000),
-                    fontSize: 50,
-                  ),
-                  textAlign: TextAlign.center,
+                Image.asset(
+                  'assets/placeholder-logo.png',
+                  // width: 85,
                 ),
+                // const Text( // Logo (REPLACE)
+                //   'BCM Logo',
+                //   style: TextStyle(
+                //     color: Color.fromARGB(255, 255, 98, 0),
+                //     fontWeight: FontWeight(1000),
+                //     fontSize: 50,
+                //   ),
+                //   textAlign: TextAlign.center,
+                // ),
                 Text( // Error message
                   // Message
                   '${screenError.message}',
