@@ -8,4 +8,4 @@ cmakeAppName="${newAppName// /_}"
 
 dart run rename setAppName --targets 'windows,android,macos,ios' --value "$newAppName"
 
-dart run rename setAppName --targets 'linux' -- value "$cmakeAppName"
+dart run rename setAppName --targets 'linux' --value "$cmakeAppName"
