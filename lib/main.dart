@@ -489,28 +489,26 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
   }) async {
     _downloadProgress.value = 'Starting Download...';
 
-    final messenger = _scaffoldMessengerKey.currentState;
-    if (messenger == null) {
-      throw StateError('ScaffoldMessenger is not available');
-    }
-
-    messenger.showSnackBar(
-      SnackBar(
-        content: ValueListenableBuilder<String>(
-          valueListenable: _downloadProgress,
-          builder: (context, progress, _) => Text(progress),
-        ),
-        duration: const Duration(days: 1),
-      ),
-    );
+    ScaffoldMessengerState? messenger;
 
     await _checkForMediaChanges(
-      checkPayload: checkPayload, 
-      onDownloadProgress: (
-        phase,
-        completed,
-        total,
-      ) {
+      checkPayload: checkPayload,
+      onDownloadStarted: () {
+        messenger = _scaffoldMessengerKey.currentState;
+        if (messenger == null) {
+          throw StateError('ScaffoldMessenger is not available');
+        }
+        messenger!.showSnackBar(
+          SnackBar(
+            content: ValueListenableBuilder<String>(
+              valueListenable: _downloadProgress,
+              builder: (context, progress, _) => Text(progress),
+            ),
+            duration: const Duration(days: 1),
+          ),
+        );
+      },
+      onDownloadProgress: (phase, completed, total) {
         if (mounted) {
           _downloadProgress.value =
               'Downloading $phase: $completed/$total';
@@ -518,12 +516,10 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
       }
     );
 
-    if(mounted) {
-      messenger.hideCurrentSnackBar();
-    }
-    
-    if(_downloadProgress.value != 'Starting Download...') {
-      await messenger
+    final activeMessenger = messenger;
+    if (mounted && activeMessenger != null) {
+      activeMessenger.hideCurrentSnackBar();
+      await activeMessenger
         .showSnackBar(
           const SnackBar(
             content: Text('Completed!'),
@@ -592,6 +588,7 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
   // Clear everything if there are changes.
   Future<void> _checkForMediaChanges({
     bool checkPayload = false,
+    void Function()? onDownloadStarted,
     void Function(String phase, int completed, int total)? onDownloadProgress,
   }) async {
     if (_isPreparingMedia) return;
@@ -612,7 +609,9 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
         await _apiCall.cleanupStoredMedia();
         return;
       }
-      
+
+      onDownloadStarted?.call();
+
       // Rebuild all media
     final updatedMediaLinks = await _apiCall
         .rebuildMediaForCurrentSchedules(onProgress: (completed, total) =>
@@ -677,7 +676,11 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
       _isCheckingForChanges = false;
       if (_payloadCheckQueued && mounted) {
         _payloadCheckQueued = false;
-        unawaited(_checkForMediaChanges(checkPayload: true, onDownloadProgress: onDownloadProgress));
+        await _checkForMediaChanges(
+          checkPayload: true,
+          onDownloadStarted: onDownloadStarted,
+          onDownloadProgress: onDownloadProgress,
+        );
       }
     }
   }
