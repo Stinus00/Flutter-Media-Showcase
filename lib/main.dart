@@ -138,7 +138,9 @@ class _VideoAppState extends State<VideoApp> with WidgetsBindingObserver {
       _reloadTimer = Timer(const Duration(hours: 12), reloadPage);
     }
 
-    VideoPlayerMediaKit.ensureInitialized(windows: true, linux: true);
+    VideoPlayerMediaKit.ensureInitialized(
+      linux: true
+    );
 
     _connectivitySubscription = Connectivity().onConnectivityChanged.listen(
       _updateConnectivity,
